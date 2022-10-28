@@ -15,9 +15,9 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
 #iterate through one simulation per combo of params
-base_model <- lapply(1:nrow(params), function(x){
-  model(pop_size, t, priors = c(5, 0, 0, 0), neg_cost = params$neg_costs[x], n_moves = params$n_moves[x], phi = 0.5, delta = 0, kappa = 0, lambda = 1, cores = 47)
+loss_model <- lapply(1:nrow(params), function(x){
+  model(pop_size, t, priors = c(5, 0, 0, 0), neg_cost = params$neg_costs[x], n_moves = params$n_moves[x], phi = 0.5, delta = 0.2, kappa = 0, lambda = 1, loss_averse = TRUE, cores = 47)
 })
 
 #save simulations
-save(base_model, file = "base_model.RData")
+save(loss_model, file = "loss_model.RData")

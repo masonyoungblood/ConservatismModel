@@ -279,6 +279,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
   
   #return output
   return(output)
+  
+  #garbage collection
+  gc()
 }
 
 #model plotting function, strategies or moves (strats = TRUE/FALSE)
