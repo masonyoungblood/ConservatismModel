@@ -120,7 +120,7 @@ ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = F
   #cournot best response: phi = 0, delta = 1, kappa = 0, n = 1... (simplified: pi)
 model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves = 4,
                   default_strat = c(0, 0, 0), m_diag = 5, off_diag = 0, sd = 1, neg_cost = 0.5, power_skew = 1,
-                  n = 1, phi, delta = 0, kappa, lambda, pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, cores = 7){
+                  n = 1, phi, delta = 0, kappa, lambda, pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   #init_move_probs <- c(1, 1, 1, 1)
   init_move_probs <- rep(1, n_moves)
@@ -148,7 +148,7 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
     duos$y <- sample(c(1:pop_size)[-duos$x])
     
     #iterate through duos in parallel with mclapply
-    coord_game_results <- parallel::mclapply(1:nrow(duos), function(j){
+    coord_game_results <- lapply(1:nrow(duos), function(j){
       if(!static_prefs){
         #calculate payoffs from different moves
         move_payoffs_a <- sapply(1:n_moves, function(x){coord_game(as.numeric(agents[duos[j, 1], 2:4]), x, duos[j, 1], duos[j, 2], status_quo, neg_cost, agents)})
@@ -237,7 +237,7 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
                              negotiation_a = negotiation_ewa_b$a,
                              matching_a = matching_ewa_b$a)))
       }
-    }, mc.cores = cores)
+    })
     
     #get preferred strategies of everyone in column 1 of duos, and then everyone in column 2
     pref_strats <- do.call(rbind, c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$pref_strats}), 
