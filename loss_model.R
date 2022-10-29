@@ -17,10 +17,10 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
 
 #wrap model function for slurm
 model_slurm <- function(neg_costs, n_moves){
-  model(pop_size = 5000, t = 100, priors = c(5, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 0.5, delta = 0.2, kappa = 0, lambda = 1, loss_averse = TRUE, cores = 1)
+  model(pop_size = 5000, t = 100, priors = c(5, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 0.5, delta = 0.2, kappa = 0, lambda = 1, loss_averse = TRUE)
 }
 
 #run simulations
 rslurm::slurm_apply(model_slurm, params, jobname = "loss_model",
-                    nodes = 1, cpus_per_node = 39, pkgs = pkgs,
-                    global_objects = objects(), slurm_options = list(mem = 0))
+                    nodes = 1, cpus_per_node = 40, pkgs = pkgs,
+                    global_objects = objects(), slurm_options = list(mem = "230G"))
