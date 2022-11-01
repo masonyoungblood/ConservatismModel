@@ -106,6 +106,27 @@ ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = F
   return(list(a = a_new, n = n_new, probs = probs))
 }
 
+#function for sampling unique rows from network
+network_sampler <- function(pop_structure){
+  #sample first edge
+  sampled_edges <- sample(nrow(pop_structure), 1)
+  
+  #overwrite remaining rows with unsampled nodes
+  remaining <- c(1:nrow(pop_structure))[-which(pop_structure[, 1] %in% c(pop_structure[sampled_edges, ]) | pop_structure[, 2] %in% c(pop_structure[sampled_edges, ]))]
+  
+  #while edges are available to be sampled
+  while(length(remaining) > 0){
+    #sample from remaining rows
+    sampled_edges <- c(sampled_edges, ifelse(length(remaining) > 1, sample(remaining, 1), remaining))
+    
+    #overwrite remaining rows with unsampled nodes
+    remaining <- c(1:nrow(pop_structure))[-which(pop_structure[, 1] %in% c(pop_structure[sampled_edges, ]) | pop_structure[, 2] %in% c(pop_structure[sampled_edges, ]))]
+  }
+  
+  #return edges to be sampled
+  return(sampled_edges)
+}
+
 #full model function
 #ewa parameters:
   #n (prior for n)
@@ -120,8 +141,9 @@ ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = F
   #fictitious play: phi = 1, delta = 1, kappa = 0, n = 1... (simplified: (a + pi)/2))
   #cournot best response: phi = 0, delta = 1, kappa = 0, n = 1... (simplified: pi)
 model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves = 4,
-                  default_strat = c(0, 0, 0), m_diag = 5, off_diag = 0, sd = 1, neg_cost = 0.5, power_skew = 1,
-                  n = 1, phi, delta = 0, kappa, lambda, pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE){
+                  default_strat = c(0, 0, 0), m_diag = 5, off_diag = 0, sd = 1,
+                  neg_cost = 0.5, power_skew = 1, n = 1, phi, delta = 0, kappa, lambda,
+                  pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   #init_move_probs <- c(1, 1, 1, 1)
   init_move_probs <- rep(1, n_moves)
@@ -143,10 +165,18 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
   output <- list()
   output[[1]] <- agents
   
+  #if networked = TRUE, then generate a scale free network
+  if(networked){pop_structure <- igraph::as_edgelist(igraph::sample_pa(pop_size, directed = FALSE, power = 1))}
+  
   for(i in 2:t){
-    #generate data frame of duos to coordinate (fully-connected population)
-    duos <- data.frame(x = sample(1:pop_size, pop_size/2), y = NA)
-    duos$y <- sample(c(1:pop_size)[-duos$x])
+    #generate data frame of duos to coordinate (fully-connected or networked population)
+    if(networked){
+      duos <- as.data.frame(pop_structure[network_sampler(pop_structure), ])
+      colnames(duos) <- c("x", "y")
+    } else{
+      duos <- data.frame(x = sample(1:pop_size, pop_size/2), y = NA)
+      duos$y <- sample(c(1:pop_size)[-duos$x])
+    }
     
     #iterate through duos in parallel with mclapply
     coord_game_results <- lapply(1:nrow(duos), function(j){
@@ -249,8 +279,8 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
     })
     
     #get preferred strategies of everyone in column 1 of duos, and then everyone in column 2
-    pref_strats <- do.call(rbind, c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$pref_strats}), 
-                                    lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$pref_strats})))
+    pref_strats <- do.call(rbind, c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$pref_strats}), 
+                                    lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$pref_strats})))
     
     #overwrite current preferences and strategies
     if(!static_prefs){
@@ -266,19 +296,19 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
     
     #overwrite a values for preferences and strategies
     if(!static_prefs){
-      agents$a_moves[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$move_a}),
-                                             lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$move_a}))
+      agents$a_moves[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$move_a}),
+                                             lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$move_a}))
     }
-    agents$a_advertisement[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$advertisement_a}),
-                                                   lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$advertisement_a}))
-    agents$a_negotiation[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$negotiation_a}),
-                                                 lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$negotiation_a}))
-    agents$a_matching[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$matching_a}),
-                                              lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$matching_a}))
+    agents$a_advertisement[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$advertisement_a}),
+                                                   lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$advertisement_a}))
+    agents$a_negotiation[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$negotiation_a}),
+                                                 lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$negotiation_a}))
+    agents$a_matching[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$matching_a}),
+                                              lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$matching_a}))
     
     #overwrite actually played outcomes
-    agents$actual_outcome[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$actual_outcome}),
-                                                  lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$actual_outcome}))
+    agents$actual_outcome[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$actual_outcome}),
+                                                  lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$actual_outcome}))
     
     #overwrite n
     n <- observation(n, phi, kappa)
@@ -312,7 +342,7 @@ plot_model <- function(output, colors = NULL, strats = TRUE, xlim = NULL){
     output_mat <- sapply(1:t, function(x){as.numeric(table(factor(sapply(1:pop_size, function(y){paste0(output[[x]][y, 2:4], collapse = "")}), levels = poss_patterns)))})
     
     #generate colors for plotting
-    if(is.null(colors)){colors <- c("black", distinctColorPalette(length(poss_patterns) - 1))}
+    if(is.null(colors)){colors <- c("black", randomcoloR::distinctColorPalette(length(poss_patterns) - 1))}
     
     #plot
     par(mar = c(4, 4, 1, 1))
