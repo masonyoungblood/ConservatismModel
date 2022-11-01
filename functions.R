@@ -33,13 +33,14 @@ payoff_matrix_constructor <- function(n_moves, off_diag, m, sd){
 
 #play coordination game with an opponent (b) using an arbitrary strategy and preference
 #strat is a 3L vector with a 0/1 for advertisement, negotiation, and matching
-coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data){
+#return character with actually used strategy, when actual == TRUE
+coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = FALSE){
   #get advertised move
   advertised_a <- ifelse(strat[1] == 0, pref, status_quo)
   advertised_b <- ifelse(data$advertisement[b] == 0, data$pref[b], status_quo)
   
   #if they match, return payoff of advertised move
-  if(advertised_a == advertised_b){return(diag(data$payoffs[[a]])[advertised_a])}
+  if(advertised_a == advertised_b){return(ifelse(actual, paste0(strat[1], "0", "0"), diag(data$payoffs[[a]])[advertised_a]))}
   
   #if they do not match and both are negotiators, return payoff of move from agent with highest power
   if(advertised_a != advertised_b & strat[2] == 1 & data$negotiation[b] == 1){
@@ -47,7 +48,7 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data){
     prob_a <- exp(data$power[a])/sum(exp(data$power[a]), exp(data$power[b]))
     
     #return payoff of move (from a's payoff matrix), chosen with probability weighted by power
-    return(sample(diag(data$payoffs[[a]])[c(advertised_a, advertised_b)], 1, prob = c(prob_a, 1 - prob_a)))
+    return(ifelse(actual, paste0(strat[1], strat[2], "0"), sample(diag(data$payoffs[[a]])[c(advertised_a, advertised_b)], 1, prob = c(prob_a, 1 - prob_a))))
   }
   
   #if they do not match and only one or neither are negotiators
@@ -58,8 +59,8 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data){
     
     #return appropriate payoff
     ifelse(chosen_a == chosen_b,
-           return(diag(data$payoffs[[a]])[chosen_a]),
-           return(data$payoffs[[a]][chosen_a, chosen_b]))
+           return(ifelse(actual, paste0(strat, collapse = ""), diag(data$payoffs[[a]])[chosen_a])),
+           return(ifelse(actual, paste0(strat, collapse = ""), data$payoffs[[a]][chosen_a, chosen_b])))
   }
 }
 
@@ -129,7 +130,7 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
   agents <- data.table::data.table(pref = sample(n_moves, pop_size, replace = TRUE, prob = init_move_probs),
                                    advertisement = default_strat[1], negotiation = default_strat[2], matching = default_strat[3],
                                    payoffs = lapply(1:pop_size, function(x){payoff_matrix_constructor(n_moves, off_diag, m_diag, sd)}),
-                                   power = rgamma(pop_size, power_skew),
+                                   power = rgamma(pop_size, power_skew), actual_outcome = NA,
                                    a_moves = lapply(1:pop_size, function(x){c(priors[1], rep(0, n_moves - 1))}),
                                    a_advertisement = lapply(1:pop_size, function(x){c(priors[2], 0)}),
                                    a_negotiation = lapply(1:pop_size, function(x){c(priors[3], 0)}),
@@ -149,6 +150,10 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
     
     #iterate through duos in parallel with mclapply
     coord_game_results <- lapply(1:nrow(duos), function(j){
+      #get actually played outcomes for a and b
+      actual_outcome_a <- coord_game(as.numeric(agents[duos[j, 1], 2:4]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, actual = TRUE)
+      actual_outcome_b <- coord_game(as.numeric(agents[duos[j, 2], 2:4]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, actual = TRUE)
+      
       if(!static_prefs){
         #calculate payoffs from different moves
         move_payoffs_a <- sapply(1:n_moves, function(x){coord_game(as.numeric(agents[duos[j, 1], 2:4]), x, duos[j, 1], duos[j, 2], status_quo, neg_cost, agents)})
@@ -218,21 +223,25 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
       #return objects
       if(!static_prefs){
         return(list(a = list(pref_strats = pref_strats_a,
+                             actual_outcome = actual_outcome_a,
                              move_a = move_ewa_a$a,
                              advertisement_a = advertisement_ewa_a$a,
                              negotiation_a = negotiation_ewa_a$a,
                              matching_a = matching_ewa_a$a),
                     b = list(pref_strats = pref_strats_b,
+                             actual_outcome = actual_outcome_b,
                              move_a = move_ewa_b$a,
                              advertisement_a = advertisement_ewa_b$a,
                              negotiation_a = negotiation_ewa_b$a,
                              matching_a = matching_ewa_b$a)))
       } else{
         return(list(a = list(pref_strats = pref_strats_a,
+                             actual_outcome = actual_outcome_a,
                              advertisement_a = advertisement_ewa_a$a,
                              negotiation_a = negotiation_ewa_a$a,
                              matching_a = matching_ewa_a$a),
                     b = list(pref_strats = pref_strats_b,
+                             actual_outcome = actual_outcome_b,
                              advertisement_a = advertisement_ewa_b$a,
                              negotiation_a = negotiation_ewa_b$a,
                              matching_a = matching_ewa_b$a)))
@@ -266,6 +275,10 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
                                                  lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$negotiation_a}))
     agents$a_matching[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$matching_a}),
                                               lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$matching_a}))
+    
+    #overwrite actually played outcomes
+    agents$actual_outcome[c(duos$x, duos$y)] <- c(lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$a$actual_outcome}),
+                                                  lapply(1:(pop_size/2), function(x){coord_game_results[[x]]$b$actual_outcome}))
     
     #overwrite n
     n <- observation(n, phi, kappa)
