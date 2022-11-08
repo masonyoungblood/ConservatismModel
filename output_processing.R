@@ -44,11 +44,11 @@ for(i in 1:length(models)){
   })
   
   #save simplified output
-  save(params, file = paste0(models[i], "_output.RData"))
+  save(params, file = paste0("output/", models[i], "_output.RData"))
   
-  #save final timestep as separate object
+  #save final timesteps as separate object
   final <- lapply(1:length(output), function(x){output[[x]][[t]]})
-  save(final, file = paste0(models[i], "_final.RData"))
+  save(final, file = paste0("output/", models[i], "_final.RData"))
   
   #remove objects
   rm(list = c("output", "params"))
