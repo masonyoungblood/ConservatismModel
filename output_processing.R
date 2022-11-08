@@ -46,6 +46,10 @@ for(i in 1:length(models)){
   #save simplified output
   save(params, file = paste0(models[i], "_output.RData"))
   
+  #save final timestep as separate object
+  final <- output[[t]]
+  save(final, file = paste0(models[i], "_final.RData"))
+  
   #remove objects
   rm(list = c("output", "params"))
 }
