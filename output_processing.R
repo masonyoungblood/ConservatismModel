@@ -47,12 +47,12 @@ for(i in 1:length(models)){
   attractive <- list(
     status_quo = lapply(1:nrow(params), function(x){
       sapply(1:t, function(y){
-        median(sapply(1:pop_size), function(z){output[[x]][[y]]$a_moves[[z]][1]})
+        median(sapply(1:pop_size, function(z){output[[x]][[y]]$a_moves[[z]][1]}))
       })
     }),
     arbitrary = lapply(1:nrow(params), function(x){
       sapply(1:t, function(y){
-        median(sapply(1:pop_size), function(z){output[[x]][[y]]$a_moves[[z]][2]})
+        median(sapply(1:pop_size, function(z){output[[x]][[y]]$a_moves[[z]][2]}))
       })
     })
   )
