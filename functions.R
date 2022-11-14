@@ -142,7 +142,7 @@ network_sampler <- function(pop_structure){
   #cournot best response: phi = 0, delta = 1, kappa = 0, n = 1... (simplified: pi)
 model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves = 4,
                   default_strat = c(0, 0, 0), m_diag = 5, off_diag = 0, sd = 1,
-                  neg_cost = 0.5, power_skew = 1, n = 1, phi, delta = 0, kappa, lambda,
+                  neg_cost = 0.5, power_skew = 2, n = 1, phi, delta = 0, kappa, lambda,
                   pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   #init_move_probs <- c(1, 1, 1, 1)
@@ -165,8 +165,8 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
   output <- list()
   output[[1]] <- agents
   
-  #if networked = TRUE, then generate a scale free network
-  if(networked){pop_structure <- igraph::as_edgelist(igraph::sample_pa(pop_size, directed = FALSE, power = 1))}
+  #if networked = TRUE, then generate a scale free network (m = 2 leads to mean degree of 4)
+  if(networked){pop_structure <- igraph::as_edgelist(igraph::sample_pa(pop_size, directed = FALSE, m = 2))}
   
   for(i in 2:t){
     #generate data frame of duos to coordinate (fully-connected or networked population)

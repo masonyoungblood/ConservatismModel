@@ -43,13 +43,30 @@ for(i in 1:length(models)){
     }))
   })
   
+  #store median a value for status quo move and arbitrary other move in params data frame
+  attractive <- list(
+    status_quo = lapply(1:nrow(params), function(x){
+      sapply(1:t, function(y){
+        median(sapply(1:pop_size), function(z){output[[x]][[y]]$a_moves[[z]][1]})
+      })
+    }),
+    arbitrary = lapply(1:nrow(params), function(x){
+      sapply(1:t, function(y){
+        median(sapply(1:pop_size), function(z){output[[x]][[y]]$a_moves[[z]][2]})
+      })
+    })
+  )
+  
   #save simplified output
   save(params, file = paste0("output/", models[i], "_output.RData"))
+  
+  #save a values
+  save(attractive, file = paste0("output/", models[i], "_attr.RData"))
   
   #save final timesteps as separate object
   final <- lapply(1:length(output), function(x){output[[x]][[t]]})
   save(final, file = paste0("output/", models[i], "_final.RData"))
   
   #remove objects
-  rm(list = c("output", "params"))
+  rm(list = c("output", "params", "attractive"))
 }
