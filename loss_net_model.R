@@ -17,7 +17,7 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
 
 #wrap model function for slurm
 model_slurm <- function(neg_costs, n_moves){
-  model(pop_size = 5000, t = 100, priors = c(5, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 0.5, delta = 1, kappa = 0, lambda = 1, loss_averse = TRUE, networked = TRUE)
+  model(pop_size = 5000, t = 100, priors = c(1, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 0.5, delta = 1, kappa = 0, lambda = 1, loss_averse = TRUE, networked = TRUE)
 }
 
 #run simulations
