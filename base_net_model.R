@@ -8,7 +8,10 @@ source("functions.R")
 pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
-neg_costs <- seq(0, 5, 0.5)
+pop_size <- 500
+t <- 100
+reps <- 10
+neg_costs <- seq(0, 10, 1)
 n_moves <- seq(2, 12, 1)
 
 #store params in data frame
@@ -17,7 +20,9 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
 
 #wrap model function for slurm
 model_slurm <- function(neg_costs, n_moves){
-  model(pop_size = 5000, t = 100, priors = c(1, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 0.5, delta = 0, kappa = 0, lambda = 1, networked = TRUE)
+  #lapply(1:reps, function(x){
+    model(pop_size = pop_size, t = t, priors = c(1, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 0.5, delta = 0, kappa = 0, lambda = 1, networked = TRUE)
+  #})
 }
 
 #run simulations
