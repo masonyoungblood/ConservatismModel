@@ -48,7 +48,7 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = F
     prob_a <- exp(data$power[a])/sum(exp(data$power[a]), exp(data$power[b]))
     
     #return payoff of move (from a's payoff matrix), chosen with probability weighted by power
-    return(ifelse(actual, paste0(strat[1], strat[2], "0"), sample(diag(data$payoffs[[a]])[c(advertised_a, advertised_b)], 1, prob = c(prob_a, 1 - prob_a))))
+    return(ifelse(actual, paste0(strat[1], strat[2], "0"), sample(diag(data$payoffs[[a]])[c(advertised_a, advertised_b)], 1, prob = c(prob_a, 1 - prob_a))-neg_cost))
   }
   
   #if they do not match and only one or neither are negotiators

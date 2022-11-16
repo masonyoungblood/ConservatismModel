@@ -7,9 +7,9 @@ setwd(system("pwd", intern = T))
 models <- c("base", "base_net", "loss", "loss_net")
 
 #set parameters
-neg_costs <- seq(0, 5, 0.5)
+neg_costs <- seq(0, 10, 1)
 n_moves <- seq(2, 12, 1)
-pop_size <- 5000
+pop_size <- 500
 t <- 100
 
 #loop through models
