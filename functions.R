@@ -34,7 +34,7 @@ payoff_matrix_constructor <- function(n_moves, off_diag, m, sd){
 #play coordination game with an opponent (b) using an arbitrary strategy and preference
 #strat is a 3L vector with a 0/1 for advertisement, negotiation, and matching
 #return character with actually used strategy, when actual == TRUE
-coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = FALSE){
+coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = FALSE, power_weighted = FALSE){
   #get advertised move
   advertised_a <- ifelse(strat[1] == 0, pref, status_quo)
   advertised_b <- ifelse(data$advertisement[b] == 0, data$pref[b], status_quo)
@@ -44,11 +44,17 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = F
   
   #if they do not match and both are negotiators, return payoff of move from agent with highest power
   if(advertised_a != advertised_b & strat[2] == 1 & data$negotiation[b] == 1){
-    #convert power values to probability with softmax
-    prob_a <- exp(data$power[a])/sum(exp(data$power[a]), exp(data$power[b]))
-    
-    #return payoff of move (from a's payoff matrix), chosen with probability weighted by power
-    return(ifelse(actual, paste0(strat[1], strat[2], "0"), sample(diag(data$payoffs[[a]])[c(advertised_a, advertised_b)], 1, prob = c(prob_a, 1 - prob_a))-neg_cost))
+    #if power is used to weight probability
+    if(power_weighted){
+      #convert power values to probability with softmax
+      prob_a <- exp(data$power[a])/sum(exp(data$power[a]), exp(data$power[b]))
+      
+      #return payoff of move (from a's payoff matrix), chosen with probability weighted by power
+      return(ifelse(actual, paste0(strat[1], strat[2], "0"), sample(diag(data$payoffs[[a]])[c(advertised_a, advertised_b)], 1, prob = c(prob_a, 1 - prob_a))-neg_cost))
+    } else{
+      #otherwise, return move of highest power player
+      return(ifelse(data$power[a] > data$power[b], diag(data$payoffs[[a]])[advertised_a]-neg_cost, diag(data$payoffs[[a]])[advertised_b]-neg_cost))
+    }
   }
   
   #if they do not match and only one or neither are negotiators
@@ -143,7 +149,7 @@ network_sampler <- function(pop_structure){
 model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves = 4,
                   default_strat = c(0, 0, 0), m_diag = 5, off_diag = 0, sd = 1,
                   neg_cost = 0.5, power_skew = 2, n = 1, phi, delta = 0, kappa, lambda,
-                  pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE){
+                  pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE, power_weighted = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   #init_move_probs <- c(1, 1, 1, 1)
   init_move_probs <- rep(1, n_moves)
@@ -181,13 +187,13 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
     #iterate through duos in parallel with mclapply
     coord_game_results <- lapply(1:nrow(duos), function(j){
       #get actually played outcomes for a and b
-      actual_outcome_a <- coord_game(as.numeric(agents[duos[j, 1], 2:4]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, actual = TRUE)
-      actual_outcome_b <- coord_game(as.numeric(agents[duos[j, 2], 2:4]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, actual = TRUE)
+      actual_outcome_a <- coord_game(as.numeric(agents[duos[j, 1], 2:4]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, actual = TRUE, power_weighted = power_weighted)
+      actual_outcome_b <- coord_game(as.numeric(agents[duos[j, 2], 2:4]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, actual = TRUE, power_weighted = power_weighted)
       
       if(!static_prefs){
         #calculate payoffs from different moves
-        move_payoffs_a <- sapply(1:n_moves, function(x){coord_game(as.numeric(agents[duos[j, 1], 2:4]), x, duos[j, 1], duos[j, 2], status_quo, neg_cost, agents)})
-        move_payoffs_b <- sapply(1:n_moves, function(x){coord_game(as.numeric(agents[duos[j, 2], 2:4]), x, duos[j, 2], duos[j, 1], status_quo, neg_cost, agents)})
+        move_payoffs_a <- sapply(1:n_moves, function(x){coord_game(as.numeric(agents[duos[j, 1], 2:4]), x, duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+        move_payoffs_b <- sapply(1:n_moves, function(x){coord_game(as.numeric(agents[duos[j, 2], 2:4]), x, duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
         
         #solve ewa for moves
         move_ewa_a <- ewa(a = agents$a_moves[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$pref[duos[j, 1]], 
@@ -198,9 +204,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
       
       #calculate payoffs for advertisement
       advertisement_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 1]], agents$matching[duos[j, 1]]),
-                                                                        agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents)})
+                                                                        agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
       advertisement_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 2]], agents$matching[duos[j, 2]]),
-                                                                        agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents)})
+                                                                        agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
       
       #solve ewa for advertisement
       advertisement_ewa_a <- ewa(a = agents$a_advertisement[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$advertisement[duos[j, 1]] + 1, 
@@ -210,9 +216,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
       
       #calculate payoffs for negotiation
       negotiation_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], x, agents$matching[duos[j, 1]]),
-                                                                      agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents)})
+                                                                      agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
       negotiation_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 2]], x, agents$matching[duos[j, 2]]),
-                                                                      agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents)})
+                                                                      agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
       
       #solve ewa for negotiation
       negotiation_ewa_a <- ewa(a = agents$a_negotiation[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$negotiation[duos[j, 1]] + 1, 
@@ -222,9 +228,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
       
       #calculate payoffs for matching
       matching_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], agents$negotiation[duos[j, 1]], x),
-                                                                   agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents)})
+                                                                   agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
       matching_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 2]], agents$negotiation[duos[j, 2]], x),
-                                                                   agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents)})
+                                                                   agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
       
       #solve ewa for matching
       matching_ewa_a <- ewa(a = agents$a_matching[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$matching[duos[j, 1]] + 1, 
@@ -289,9 +295,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0, 0), n_moves =
       agents$negotiation[c(duos$x, duos$y)] <- pref_strats[, 3]
       agents$matching[c(duos$x, duos$y)] <- pref_strats[, 4]
     } else{
-      agents$advertisement[c(duos$x, duos$y)] <- pref_strats[, 2]
-      agents$negotiation[c(duos$x, duos$y)] <- pref_strats[, 3]
-      agents$matching[c(duos$x, duos$y)] <- pref_strats[, 4]
+      agents$advertisement[c(duos$x, duos$y)] <- pref_strats[, 1]
+      agents$negotiation[c(duos$x, duos$y)] <- pref_strats[, 2]
+      agents$matching[c(duos$x, duos$y)] <- pref_strats[, 3]
     }
     
     #overwrite a values for preferences and strategies
