@@ -4,7 +4,7 @@
 setwd(system("pwd", intern = T))
 
 #set models to loop through
-models <- c("base", "base_net", "loss", "loss_net")
+models <- c("base", "base_net", "loss", "loss_net", "delta", "delta_net")
 
 #set parameters
 neg_costs <- seq(0, 10, 1)
