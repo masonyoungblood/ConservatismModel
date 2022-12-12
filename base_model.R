@@ -19,11 +19,7 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
 #wrap model function for slurm
-model_slurm <- function(neg_costs, n_moves){
-  #lapply(1:reps, function(x){
-    model(pop_size = pop_size, t = t, priors = c(1, 0, 0, 0), neg_cost = neg_costs, n_moves = n_moves, phi = 1, delta = 0, kappa = 0, lambda = 1)
-  #})
-}
+model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, delta = 0, networked = TRUE)}
 
 #run simulations
 rslurm::slurm_apply(model_slurm, params, jobname = "base_model",
