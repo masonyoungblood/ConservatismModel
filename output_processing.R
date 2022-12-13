@@ -4,7 +4,7 @@
 setwd(system("pwd", intern = T))
 
 #set models to loop through
-models <- c("base", "base_net", "loss", "loss_net", "delta", "delta_net")
+models <- c("base", "base_pref", "loss", "loss_pref", "delta", "delta_pref")
 
 #set parameters
 neg_costs <- seq(0, 10, 1)
@@ -24,7 +24,7 @@ for(i in 1:length(models)){
   #store proportion of each strategy in params data frame
   params$conservative <- sapply(1:nrow(params), function(x){
     median(sapply(1:t, function(y){
-      length(which(output[[x]][[y]]$advertisement == 1 & output[[x]][[y]]$negotiation == 0 & output[[x]][[y]]$matching == 0))/pop_size
+      length(which(output[[x]][[y]]$advertisement == 1 & output[[x]][[y]]$negotiation == 0))/pop_size
     }))
   })
   params$advertisement <- sapply(1:nrow(params), function(x){
@@ -35,11 +35,6 @@ for(i in 1:length(models)){
   params$negotiation <- sapply(1:nrow(params), function(x){
     median(sapply(1:t, function(y){
       length(which(output[[x]][[y]]$negotiation == 1))/pop_size
-    }))
-  })
-  params$matching <- sapply(1:nrow(params), function(x){
-    median(sapply(1:t, function(y){
-      length(which(output[[x]][[y]]$matching == 1))/pop_size
     }))
   })
   
