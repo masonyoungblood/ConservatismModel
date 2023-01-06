@@ -1,4 +1,4 @@
-# BASE MODEL --------------------------------------------------------------
+# REINFORCEMENT MODEL -----------------------------------------------------
 
 #set working directory, load source code, libraries
 setwd(system("pwd", intern = T))
@@ -19,9 +19,9 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
 #wrap model function for slurm
-model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, delta = 1, networked = TRUE, loss_averse = TRUE)}
+model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, delta = 0, pref_payoff = TRUE, static_prefs = TRUE, networked = TRUE)}
 
 #run simulations
-rslurm::slurm_apply(model_slurm, params, jobname = "loss_model",
+rslurm::slurm_apply(model_slurm, params, jobname = "reinforcement_model",
                     nodes = 1, cpus_per_node = 40, pkgs = pkgs,
                     global_objects = objects(), slurm_options = list(mem = "230G"))

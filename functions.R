@@ -4,13 +4,12 @@
 #negotiation is whether an agent tries to initiate negotiation (1) or not (0)
 
 #function for payoff matrix construction (row is self, column is other)
-payoff_matrix_constructor <- function(n_moves, off_diag, m, sd){
-  #generate payoff matrix with values from normal distribution around cost
-  #payoffs <- matrix(rnorm(n_moves*n_moves, mean = off_diag, sd = sd), nrow = n_moves, ncol = n_moves)
+payoff_matrix_constructor <- function(n_moves, out_of, off_diag = 0){
+  #generate matrix n_moves*n_moves with value off_diag
   payoffs <- matrix(off_diag, nrow = n_moves, ncol = n_moves)
   
-  #replace diagonal with values from normal distribution around 0
-  diag(payoffs) <- rnorm(n_moves, mean = m, sd = sd)
+  #replace diagonal with sequence of increasing values from off_diag to out_of (10 by default)
+  diag(payoffs) <- seq(from = off_diag, to = out_of, length.out = n_moves)
   
   #return the matrix
   return(payoffs)
@@ -62,11 +61,11 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = F
 observation <- function(n, phi = 0, kappa = 0){phi*(1 - kappa)*n + 1}
 
 #ewa attraction function, with optional loss aversion
-attraction <- function(a, n, phi, delta, i, pi, kappa, loss_averse = FALSE, m_diag){
+attraction <- function(a, n, phi, delta, i, pi, kappa, loss_averse = FALSE, out_of){
   #if loss_averse == TRUE
   if(loss_averse){
     #then set delta to 0 when pi above average
-    ifelse(pi < m_diag,
+    ifelse(pi < out_of/2,
            (phi*n*a + (delta + (1 - delta)*i)*pi)/observation(n, phi, kappa),
            (phi*n*a + i*pi)/observation(n, phi, kappa))
   } else{
@@ -79,7 +78,7 @@ softmax <- function(a, a_all, lambda){exp(lambda*a)/sum(exp(lambda*a_all))}
 
 #full ewa function, which requires current attraction and payoff of both strategies
 #when delta != 0, a, strat_used, and pi are vectors (strat_used is 0s and 1s, where 1 denotes which was used)
-ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = FALSE, m_diag){
+ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = FALSE, out_of){
   #if strat_used is a single number, convert to vector
   if(length(strat_used) == 1){
     temp <- rep(0, length(a))
@@ -88,7 +87,7 @@ ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = F
   }
   
   #update attractions based on payoffs (pi)
-  a_new <- sapply(1:length(a), function(x){attraction(a[x], n, phi, delta, strat_used[x], pi[x], kappa, loss_averse, m_diag)})
+  a_new <- sapply(1:length(a), function(x){attraction(a[x], n, phi, delta, strat_used[x], pi[x], kappa, loss_averse, out_of)})
 
   #update (global) n
   n_new <- observation(n, phi, kappa)
@@ -134,8 +133,8 @@ network_sampler <- function(pop_structure){
   #weighted fictitious play: delta = 1, kappa = 0, n = 1... (simplified: (phi*a + pi)/(phi + 1))
   #fictitious play: phi = 1, delta = 1, kappa = 0, n = 1... (simplified: (a + pi)/2))
   #cournot best response: phi = 0, delta = 1, kappa = 0, n = 1... (simplified: pi)
-model <- function(pop_size, t, status_quo = 1, priors = c(0.5, 0, 0), n_moves = 4,
-                  default_strat = c(0, 0), m_diag = 5, off_diag = 0, sd = 1,
+model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
+                  n_moves = 4, default_strat = c(0, 0), out_of = 10,
                   neg_cost = 0.5, power_skew = 10, n = 1, phi = 1, delta = 0, kappa = 0, lambda = 1,
                   pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE, power_weighted = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
@@ -145,7 +144,7 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0.5, 0, 0), n_moves = 
   #initialize population of agents with 
   agents <- data.table::data.table(pref = sample(n_moves, pop_size, replace = TRUE, prob = init_move_probs),
                                    advertisement = default_strat[1], negotiation = default_strat[2],
-                                   payoffs = lapply(1:pop_size, function(x){payoff_matrix_constructor(n_moves, off_diag, m_diag, sd)}),
+                                   payoffs = lapply(1:pop_size, function(x){payoff_matrix_constructor(n_moves = n_moves, out_of = out_of)}),
                                    power = rgamma(pop_size, power_skew), neg_outcome = NA,
                                    a_moves = lapply(1:pop_size, function(x){c(priors[1], rep(0, n_moves - 1))}),
                                    a_advertisement = lapply(1:pop_size, function(x){c(priors[2], 0)}),
@@ -184,9 +183,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0.5, 0, 0), n_moves = 
         
         #solve ewa for moves
         move_ewa_a <- ewa(a = agents$a_moves[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$pref[duos[j, 1]], 
-                          pi = move_payoffs_a, kappa = kappa, lambda = lambda, loss_averse = loss_averse, m_diag = m_diag)
+                          pi = move_payoffs_a, kappa = kappa, lambda = lambda, loss_averse = loss_averse, out_of = out_of)
         move_ewa_b <- ewa(a = agents$a_moves[[duos[j, 2]]], n = n, phi = phi, delta = delta, strat_used = agents$pref[duos[j, 2]], 
-                          pi = move_payoffs_b, kappa = kappa, lambda = lambda, loss_averse = loss_averse, m_diag = m_diag)
+                          pi = move_payoffs_b, kappa = kappa, lambda = lambda, loss_averse = loss_averse, out_of = out_of)
       }
       
       #calculate payoffs for advertisement
@@ -197,9 +196,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0.5, 0, 0), n_moves = 
       
       #solve ewa for advertisement
       advertisement_ewa_a <- ewa(a = agents$a_advertisement[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$advertisement[duos[j, 1]] + 1, 
-                                 pi = advertisement_payoffs_a, kappa = kappa, lambda = lambda, loss_averse = loss_averse, m_diag = m_diag)
+                                 pi = advertisement_payoffs_a, kappa = kappa, lambda = lambda, loss_averse = loss_averse, out_of = out_of)
       advertisement_ewa_b <- ewa(a = agents$a_advertisement[[duos[j, 2]]], n = n, phi = phi, delta = delta, strat_used = agents$advertisement[duos[j, 2]] + 1, 
-                                 pi = advertisement_payoffs_b, kappa = kappa, lambda = lambda, loss_averse = loss_averse, m_diag = m_diag)
+                                 pi = advertisement_payoffs_b, kappa = kappa, lambda = lambda, loss_averse = loss_averse, out_of = out_of)
       
       #calculate payoffs for negotiation
       negotiation_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], x),
@@ -209,9 +208,9 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0.5, 0, 0), n_moves = 
       
       #solve ewa for negotiation
       negotiation_ewa_a <- ewa(a = agents$a_negotiation[[duos[j, 1]]], n = n, phi = phi, delta = delta, strat_used = agents$negotiation[duos[j, 1]] + 1, 
-                               pi = negotiation_payoffs_a, kappa = kappa, lambda = lambda, loss_averse = loss_averse, m_diag = m_diag)
+                               pi = negotiation_payoffs_a, kappa = kappa, lambda = lambda, loss_averse = loss_averse, out_of = out_of)
       negotiation_ewa_b <- ewa(a = agents$a_negotiation[[duos[j, 2]]], n = n, phi = phi, delta = delta, strat_used = agents$negotiation[duos[j, 2]] + 1, 
-                               pi = negotiation_payoffs_b, kappa = kappa, lambda = lambda, loss_averse = loss_averse, m_diag = m_diag)
+                               pi = negotiation_payoffs_b, kappa = kappa, lambda = lambda, loss_averse = loss_averse, out_of = out_of)
       
       #sample new preference and strategies for agent a
       if(!static_prefs){
