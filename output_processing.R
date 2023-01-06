@@ -4,7 +4,7 @@
 setwd(system("pwd", intern = T))
 
 #set models to loop through
-models <- c("base", "base_pref", "loss", "loss_pref", "delta", "delta_pref")
+models <- c("reinforcement", "rational")
 
 #set parameters
 neg_costs <- seq(0, 10, 1)
