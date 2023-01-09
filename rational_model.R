@@ -8,7 +8,7 @@ source("functions.R")
 pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
-pop_size <- 500
+pop_size <- 1000
 t <- 100
 reps <- 10
 neg_costs <- seq(0, 10, 1)
