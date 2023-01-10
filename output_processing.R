@@ -10,8 +10,8 @@ models <- c("reinforcement", "rational")
 #set parameters
 neg_costs <- seq(0, 10, 1)
 n_moves <- seq(2, 12, 1)
-pop_size <- 500
-t <- 100
+pop_size <- 5000
+t <- 500
 
 #loop through models
 for(i in 1:length(models)){
