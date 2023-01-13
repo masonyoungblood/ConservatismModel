@@ -9,7 +9,7 @@ payoff_matrix_constructor <- function(n_moves, out_of, off_diag = 0){
   payoffs <- matrix(off_diag, nrow = n_moves, ncol = n_moves)
   
   #replace diagonal with random sample from sequence of increasing values from off_diag to out_of (10 by default)
-  diag(payoffs) <- sample(seq(from = off_diag, to = out_of, length.out = n_moves))
+  diag(payoffs) <- sample(seq(from = off_diag, to = out_of, length.out = n_moves+1)[-1])
   
   #return the matrix
   return(payoffs)
