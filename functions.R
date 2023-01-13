@@ -157,8 +157,11 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
   output <- list()
   output[[1]] <- agents
   
-  #if networked = TRUE, then generate a scale free network (m = 2 leads to mean degree of 4)
-  if(networked){pop_structure <- igraph::as_edgelist(igraph::sample_pa(pop_size, directed = FALSE, m = 2))}
+  #if networked = TRUE, then generate a scale free network (m = 2 leads to mean degree of 4), and set seed so network is consistent across iterations
+  if(networked){
+    set.seed(12345)
+    pop_structure <- igraph::as_edgelist(igraph::sample_pa(pop_size, directed = FALSE, m = 2))
+  }
   
   for(i in 2:t){
     #generate data frame of duos to coordinate (fully-connected or networked population)
