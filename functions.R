@@ -135,7 +135,7 @@ network_sampler <- function(pop_structure){
   #cournot best response: phi = 0, delta = 1, kappa = 0, n = 1... (simplified: pi)
 model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
                   n_moves = 4, default_strat = c(0, 0), out_of = 10,
-                  neg_cost = 0.5, power_skew = 10, n = 1, phi = 1, delta = 0, kappa = 0, lambda = 5,
+                  neg_cost = 0.5, n = 1, phi = 1, delta = 0, kappa = 0, lambda = 5,
                   pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE, power_weighted = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   #init_move_probs <- c(1, 1, 1, 1)
@@ -145,7 +145,7 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
   agents <- data.table::data.table(pref = sample(n_moves, pop_size, replace = TRUE, prob = init_move_probs),
                                    advertisement = default_strat[1], negotiation = default_strat[2],
                                    payoffs = lapply(1:pop_size, function(x){payoff_matrix_constructor(n_moves = n_moves, out_of = out_of)}),
-                                   power = rgamma(pop_size, power_skew), neg_outcome = NA,
+                                   power = rnorm(pop_size, mean = 0, sd = 4), neg_outcome = NA,
                                    a_moves = lapply(1:pop_size, function(x){c(priors[1], rep(0, n_moves - 1))}),
                                    a_advertisement = lapply(1:pop_size, function(x){c(priors[2], 0)}),
                                    a_negotiation = lapply(1:pop_size, function(x){c(priors[3], 0)}))
