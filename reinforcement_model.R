@@ -19,7 +19,7 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
 #wrap model function for slurm
-model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, delta = 0, pref_payoff = TRUE, static_prefs = TRUE, networked = TRUE)}
+model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, delta = 0, pref_payoff = TRUE, static_prefs = TRUE, networked = FALSE)}
 
 #run simulations
 rslurm::slurm_apply(model_slurm, params, jobname = "reinforcement_model",
