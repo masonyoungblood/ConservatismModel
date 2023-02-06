@@ -58,7 +58,7 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = F
 }
 
 #ewa observation function, to update the number of previous rounds of experience
-observation <- function(n, phi = 0, kappa = 0){phi*(1 - kappa)*n + 1}
+observation <- function(n, phi = 0, kappa = 0){(phi*(1 - kappa)*n) + 1}
 
 #ewa attraction function, with optional loss aversion
 attraction <- function(a, n, phi, delta, i, pi, kappa, loss_averse = FALSE, out_of){
@@ -73,7 +73,7 @@ attraction <- function(a, n, phi, delta, i, pi, kappa, loss_averse = FALSE, out_
   }
 }
 
-#ewa attraction function, with optional loss aversion
+#ewa attraction function
 tuning_attraction <- function(a, n, phi, delta, i, pi, kappa){(phi*n*a + (delta + (1 - delta)*i)*pi)/observation(n, phi, kappa)}
 
 #ewa softmax function
@@ -165,8 +165,8 @@ network_sampler <- function(pop_structure){
   #fictitious play: phi = 1, delta = 1, kappa = 0, n = 1... (simplified: (a + pi)/2))
   #cournot best response: phi = 0, delta = 1, kappa = 0, n = 1... (simplified: pi)
 model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
-                  n_moves = 4, default_strat = c(0, 0), out_of = 10,
-                  neg_cost = 0.5, n = 1, phi = 1, delta = 0, kappa = 0, lambda = 5,
+                  n_moves = 4, default_strat = c(0, 0), out_of = 1,
+                  neg_cost = 0, n = 1, phi = 1, delta = 0, kappa = 0, lambda = 50,
                   pref_payoff = FALSE, loss_averse = FALSE, static_prefs = FALSE, networked = FALSE, power_weighted = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   #init_move_probs <- c(1, 1, 1, 1)
@@ -348,8 +348,8 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
 # power_weighted <- FALSE
 
 tuning_model <- function(pop_size, t, status_quo = 1, priors = c(0, 0),
-                         n_moves = 4, default_strat = c(0, 0), out_of = 10,
-                         neg_cost = 0, n = 1, kappa = 0, lambda = 5,
+                         n_moves = 4, default_strat = c(0, 0), out_of = 1,
+                         neg_cost = 0, n = 1, kappa = 0, lambda = 50,
                          networked = FALSE, power_weighted = FALSE){
   #set initial move probabilities (was initially allowed to be customized in the model definition)
   init_move_probs <- rep(1, n_moves)

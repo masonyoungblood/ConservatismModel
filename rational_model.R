@@ -8,10 +8,9 @@ source("functions.R")
 pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
-pop_size <- 2000
+pop_size <- 5000
 t <- 50
-reps <- 10
-neg_costs <- seq(0, 10, 1)
+neg_costs <- seq(0, 1, 0.1)
 n_moves <- seq(2, 12, 1)
 
 #store params in data frame
@@ -23,5 +22,5 @@ model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, ne
 
 #run simulations
 rslurm::slurm_apply(model_slurm, params, jobname = "rational_model",
-                    nodes = 1, cpus_per_node = 40, pkgs = pkgs,
-                    global_objects = objects(), slurm_options = list(mem = "230G"))
+                    nodes = 1, cpus_per_node = 30, pkgs = pkgs,
+                    global_objects = objects(), slurm_options = list(mem = "100G"))
