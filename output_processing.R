@@ -5,7 +5,7 @@ setwd(system("pwd", intern = T))
 library(data.table)
 
 #set models to loop through
-models <- c("reinforcement", "rational")
+models <- c("reinforcement", "rational", "tuning")
 
 #set parameters
 neg_costs <- seq(0, 10, 1)

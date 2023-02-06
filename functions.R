@@ -73,6 +73,9 @@ attraction <- function(a, n, phi, delta, i, pi, kappa, loss_averse = FALSE, out_
   }
 }
 
+#ewa attraction function, with optional loss aversion
+tuning_attraction <- function(a, n, phi, delta, i, pi, kappa){(phi*n*a + (delta + (1 - delta)*i)*pi)/observation(n, phi, kappa)}
+
 #ewa softmax function
 softmax <- function(a, a_all, lambda){exp(lambda*a)/sum(exp(lambda*a_all))}
 
@@ -96,6 +99,34 @@ ewa <- function(a, n, phi, delta, strat_used, pi, kappa, lambda, loss_averse = F
   probs <- sapply(1:length(a_new), function(x){softmax(a_new[x], a_new, lambda)})
   
   #return everything named list
+  return(list(a = a_new, n = n_new, probs = probs))
+}
+
+#10.1016/j.jet.2005.12.008
+tuning_ewa <- function(a, n, strat_used, pi, kappa, lambda, cum, imm){
+  #if strat_used is a single number, convert to vector (0 if wasn't played, 1 if was played)
+  if(length(strat_used) == 1){
+    temp <- rep(0, length(a))
+    temp[strat_used] <- 1
+    strat_used <- temp
+  }
+  
+  #calculating tuning phi, where imm is binary vector and cum is frequency of previous plays
+  phi <- 1 - (0.5*sum((cum-imm)^2))
+  
+  #calculating tuning delta
+  deltas <- sapply(1:length(a), function(x){ifelse(pi[x] >= pi[which(strat_used == 1)], 1, 0)})
+  
+  #update attractions based on payoffs (pi)
+  a_new <- sapply(1:length(a), function(x){tuning_attraction(a[x], n[x], phi, deltas[x], strat_used[x], pi[x], kappa)})
+  
+  #update (local) n's
+  n_new <- sapply(1:length(a), function(x){observation(n[x], phi, kappa)})
+
+  #get probabilities based on new attractions
+  probs <- sapply(1:length(a), function(x){softmax(a_new[x], a_new, lambda)})
+  
+  #return everything in a named list
   return(list(a = a_new, n = n_new, probs = probs))
 }
 
@@ -301,6 +332,160 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0, 0),
   #garbage collection
   gc()
 }
+
+# pop_size <- 10
+# t <- 5
+# status_quo <- 1
+# priors <- c(0, 0)
+# n_moves <- 4
+# default_strat <- c(0, 0)
+# out_of <- 1
+# neg_cost <- 0
+# n <- 1
+# kappa <- 0
+# lambda <- 5
+# networked <- FALSE
+# power_weighted <- FALSE
+
+tuning_model <- function(pop_size, t, status_quo = 1, priors = c(0, 0),
+                         n_moves = 4, default_strat = c(0, 0), out_of = 10,
+                         neg_cost = 0, n = 1, kappa = 0, lambda = 5,
+                         networked = FALSE, power_weighted = FALSE){
+  #set initial move probabilities (was initially allowed to be customized in the model definition)
+  init_move_probs <- rep(1, n_moves)
+  
+  #initialize population of agents with 
+  agents <- data.table::data.table(pref = NA,
+                                   advertisement = default_strat[1], 
+                                   negotiation = default_strat[2],
+                                   payoffs = lapply(1:pop_size, function(x){payoff_matrix_constructor(n_moves = n_moves, out_of = out_of)}),
+                                   power = rnorm(pop_size, mean = 0, sd = 1), 
+                                   neg_outcome = NA,
+                                   a_advertisement = lapply(1:pop_size, function(x){c(priors[1], 0)}),
+                                   a_negotiation = lapply(1:pop_size, function(x){c(priors[2], 0)}),
+                                   n_advertisement = lapply(1:pop_size, function(x){c(n, n)}),
+                                   n_negotiation = lapply(1:pop_size, function(x){c(n, n)}),
+                                   cum_advertisement = lapply(1:pop_size, function(x){c(0, 0)}),
+                                   cum_negotiation = lapply(1:pop_size, function(x){c(0, 0)}))
+  
+  #overwrite preferred moves to be highest payoff moves
+  agents$pref <- sapply(1:pop_size, function(x){which.max(diag(agents$payoffs[[x]]))})
+  
+  #create output object
+  output <- list()
+  output[[1]] <- agents
+  
+  #if networked = TRUE, then generate a scale free network (m = 2 leads to mean degree of 4), and set seed so network is consistent across iterations
+  if(networked){
+    set.seed(12345)
+    pop_structure <- igraph::as_edgelist(igraph::sample_pa(pop_size, directed = FALSE, m = 2))
+  }
+  
+  for(i in 2:t){
+    #generate data frame of duos to coordinate (fully-connected or networked population)
+    if(networked){
+      duos <- as.data.frame(pop_structure[network_sampler(pop_structure), ])
+      colnames(duos) <- c("x", "y")
+    } else{
+      duos <- data.frame(x = sample(1:pop_size, pop_size/2), y = NA)
+      duos$y <- sample(c(1:pop_size)[-duos$x])
+    }
+    
+    #iterate through duos
+    coord_game_results <- lapply(1:nrow(duos), function(j){
+      #get actually played outcomes for a and b
+      neg_outcome_a <- coord_game(as.numeric(agents[duos[j, 1], 2:3]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, actual = TRUE, power_weighted = power_weighted)
+      neg_outcome_b <- coord_game(as.numeric(agents[duos[j, 2], 2:3]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, actual = TRUE, power_weighted = power_weighted)
+      
+      #calculate payoffs for advertisement
+      advertisement_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+      advertisement_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+      
+      #solve ewa for advertisement (note that cum and imm come from opponent, so opposite index of a, n, and strat_used)
+      advertisement_ewa_a <- tuning_ewa(a = agents$a_advertisement[[duos[j, 1]]], n = agents$n_advertisement[[duos[j, 1]]], strat_used = agents$advertisement[duos[j, 1]] + 1, pi = advertisement_payoffs_a, kappa = kappa, lambda = lambda, cum = agents$cum_advertisement[[duos[j, 2]]]/(i - 1), imm = `if`(agents$advertisement[duos[j, 2]] == 0, c(1, 0), c(0, 1)))
+      advertisement_ewa_b <- tuning_ewa(a = agents$a_advertisement[[duos[j, 2]]], n = agents$n_advertisement[[duos[j, 2]]], strat_used = agents$advertisement[duos[j, 2]] + 1, pi = advertisement_payoffs_b, kappa = kappa, lambda = lambda, cum = agents$cum_advertisement[[duos[j, 1]]]/(i - 1), imm = `if`(agents$advertisement[duos[j, 1]] == 0, c(1, 0), c(0, 1)))
+      
+      #calculate payoffs for negotiation
+      negotiation_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], x), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+      negotiation_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 2]], x), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+      
+      #solve ewa for negotiation (note that cum and imm come from opponent, so opposite index of a, n, and strat_used)
+      negotiation_ewa_a <- tuning_ewa(a = agents$a_negotiation[[duos[j, 1]]], n = agents$n_negotiation[[duos[j, 1]]], strat_used = agents$negotiation[duos[j, 1]] + 1, pi = negotiation_payoffs_a, kappa = kappa, lambda = lambda, cum = agents$cum_negotiation[[duos[j, 2]]]/(i - 1), imm = `if`(agents$negotiation[duos[j, 2]] == 0, c(1, 0), c(0, 1)))
+      negotiation_ewa_b <- tuning_ewa(a = agents$a_negotiation[[duos[j, 2]]], n = agents$n_negotiation[[duos[j, 2]]], strat_used = agents$negotiation[duos[j, 2]] + 1, pi = negotiation_payoffs_b, kappa = kappa, lambda = lambda, cum = agents$cum_negotiation[[duos[j, 1]]]/(i - 1), imm = `if`(agents$negotiation[duos[j, 1]] == 0, c(1, 0), c(0, 1)))
+      
+      #sample new strategies for agent a
+      pref_strats_a <- c(sample(c(0, 1), 1, prob = advertisement_ewa_a$probs),
+                         sample(c(0, 1), 1, prob = negotiation_ewa_a$probs))
+      
+      #sample new strategies for agent b
+      pref_strats_b <- c(sample(c(0, 1), 1, prob = advertisement_ewa_b$probs),
+                         sample(c(0, 1), 1, prob = negotiation_ewa_b$probs))
+      
+      #return objects
+      return(list(a = list(pref_strats = pref_strats_a,
+                           neg_outcome = neg_outcome_a,
+                           advertisement_a = advertisement_ewa_a$a,
+                           negotiation_a = negotiation_ewa_a$a,
+                           advertisement_n = advertisement_ewa_a$n,
+                           negotiation_n = negotiation_ewa_a$n),
+                  b = list(pref_strats = pref_strats_b,
+                           neg_outcome = neg_outcome_b,
+                           advertisement_a = advertisement_ewa_b$a,
+                           negotiation_a = negotiation_ewa_b$a,
+                           advertisement_n = advertisement_ewa_b$n,
+                           negotiation_n = negotiation_ewa_b$n)))
+    })
+    
+    #add 1 to each position of the cumulative history vectors for advertisement and negotiation
+    agents$cum_advertisement <- lapply(1:pop_size, function(x){
+      temp <- agents$cum_advertisement[[x]]
+      temp[[agents$advertisement[[x]] + 1]] <- temp[[agents$advertisement[[x]] + 1]] + 1
+      return(temp)
+    })
+    agents$cum_negotiation <- lapply(1:pop_size, function(x){
+      temp <- agents$cum_negotiation[[x]]
+      temp[[agents$negotiation[[x]] + 1]] <- temp[[agents$negotiation[[x]] + 1]] + 1
+      return(temp)
+    })
+    
+    #get preferred strategies of everyone in column 1 of duos, and then everyone in column 2
+    pref_strats <- do.call(rbind, c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$pref_strats}), 
+                                    lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$pref_strats})))
+    
+    #overwrite current preferences and strategies
+    agents$advertisement[c(duos$x, duos$y)] <- pref_strats[, 1]
+    agents$negotiation[c(duos$x, duos$y)] <- pref_strats[, 2]
+    
+    #overwrite a values for strategies
+    agents$a_advertisement[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$advertisement_a}),
+                                                   lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$advertisement_a}))
+    agents$a_negotiation[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$negotiation_a}),
+                                                 lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$negotiation_a}))
+    
+    #overwrite n values for strategies
+    agents$n_advertisement[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$advertisement_n}),
+                                                   lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$advertisement_n}))
+    agents$n_negotiation[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$negotiation_n}),
+                                                 lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$negotiation_n}))
+    
+    #overwrite actually played outcomes
+    agents$neg_outcome[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$neg_outcome}),
+                                               lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$neg_outcome}))
+    
+    #remove objects
+    rm(list = c("duos", "coord_game_results", "pref_strats"))
+    
+    #store output
+    output[[i]] <- agents
+  }
+  
+  #return output
+  return(output)
+  
+  #garbage collection
+  gc()
+}
+
 
 #model plotting function, strategies or moves (strats = TRUE/FALSE)
 plot_model <- function(output, colors = NULL, strats = TRUE, xlim = NULL){
