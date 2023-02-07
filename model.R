@@ -1,4 +1,4 @@
-# TUNING MODEL ------------------------------------------------------------
+# MODEL -------------------------------------------------------------------
 
 #set working directory, load source code, libraries
 setwd(system("pwd", intern = T))
@@ -18,9 +18,9 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
 #wrap model function for slurm
-model_slurm <- function(neg_costs, n_moves){tuning_model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves)}
+model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves)}
 
 #run simulations
-rslurm::slurm_apply(model_slurm, params, jobname = "tuning_model",
+rslurm::slurm_apply(model_slurm, params, jobname = "ewa_model",
                     nodes = 1, cpus_per_node = 30, pkgs = pkgs,
                     global_objects = objects(), slurm_options = list(mem = "100G"))

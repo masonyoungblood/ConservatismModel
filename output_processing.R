@@ -5,13 +5,13 @@ setwd(system("pwd", intern = T))
 library(data.table)
 
 #set models to loop through
-models <- c("reinforcement", "rational", "tuning")
+models <- c("full", "net")
 
 #set parameters
+pop_size <- 10000
+t <- 50
 neg_costs <- seq(0, 1, 0.1)
 n_moves <- seq(2, 12, 1)
-pop_size <- 5000
-t <- 50
 
 #loop through models
 for(i in 1:length(models)){
@@ -39,25 +39,8 @@ for(i in 1:length(models)){
     })
   })
   
-  # #store median a value for status quo move and arbitrary other move in params data frame
-  # attractive <- list(
-  #   status_quo = lapply(1:nrow(params), function(x){
-  #     sapply(1:t, function(y){
-  #       median(sapply(1:pop_size, function(z){output[[x]][[y]]$a_moves[[z]][1]}))
-  #     })
-  #   }),
-  #   arbitrary = lapply(1:nrow(params), function(x){
-  #     sapply(1:t, function(y){
-  #       median(sapply(1:pop_size, function(z){output[[x]][[y]]$a_moves[[z]][2]}))
-  #     })
-  #   })
-  # )
-  
   #save simplified output
   save(params, file = paste0("output/", models[i], "_output.RData"))
-  
-  # #save a values
-  # save(attractive, file = paste0("output/", models[i], "_attr.RData"))
   
   #save final timesteps as separate object
   final <- lapply(1:length(output), function(x){output[[x]][[t]]})
