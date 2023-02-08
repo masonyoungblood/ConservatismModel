@@ -14,18 +14,20 @@ payoff_matrix_constructor <- function(n_moves, out_of, off_diag = 0){
 
 #play coordination game with an opponent (b) using an arbitrary strategy and preference
 #strat is a 2L vector with a 0/1 for advertisement and negotiation
-#return character with actual negotiation outcome ("W" or "L") when actual == TRUE
-coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = FALSE, power_weighted = FALSE){
+coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, power_weighted = FALSE){
   #create output objects
+  actual_outcome <- NA
   payoff_outcome <- NA
-  neg_outcome <- NA
   
   #get advertised move
   advertised_a <- ifelse(strat[1] == 0, pref, status_quo)
   advertised_b <- ifelse(data$advertisement[b] == 0, data$pref[b], status_quo)
   
   #if they match, return payoff of advertised move
-  if(advertised_a == advertised_b){payoff_outcome <- diag(data$payoffs[[a]])[advertised_a]}
+  if(advertised_a == advertised_b){
+    actual_outcome <- advertised_a
+    payoff_outcome <- diag(data$payoffs[[a]])[advertised_a]
+  }
   
   #if they do not match and both are negotiators, return payoff of move from agent with highest power
   if(advertised_a != advertised_b & strat[2] == 1 & data$negotiation[b] == 1){
@@ -41,17 +43,19 @@ coord_game <- function(strat, pref, a, b, status_quo, neg_cost, data, actual = F
       win <- data$power[a] > data$power[b]
     }
     
-    #if it's a win and actual == TRUE, supply both "W" and the actual strategy
-    #otherwise return the payoff of winner's move (from a's payoff matrix)
-    neg_outcome <- ifelse(win, "W", "L")
+    #return results
+    actual_outcome <- ifelse(win, advertised_a, advertised_b)
     payoff_outcome <- ifelse(win, diag(data$payoffs[[a]])[advertised_a], diag(data$payoffs[[a]])[advertised_b])-neg_cost
   }
   
   #if they do not match and only one or neither are negotiators
-  if(advertised_a != advertised_b & (strat[2] == 0 | data$negotiation[b] == 0)){payoff_outcome <- data$payoffs[[a]][advertised_a, advertised_b]}
+  if(advertised_a != advertised_b & (strat[2] == 0 | data$negotiation[b] == 0)){
+    actual_outcome <- 0
+    payoff_outcome <- data$payoffs[[a]][advertised_a, advertised_b]
+  }
   
-  #return appropriate output
-  return(ifelse(actual, neg_outcome, payoff_outcome))
+  #return output
+  return(c(actual_outcome, payoff_outcome))
 }
 
 #EWA observation function, to update the number of previous rounds of experience
@@ -130,7 +134,7 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0),
                                    negotiation = default_strat[2],
                                    payoffs = lapply(1:pop_size, function(x){payoff_matrix_constructor(n_moves = n_moves, out_of = out_of)}),
                                    power = rnorm(pop_size, mean = 0, sd = 1), 
-                                   neg_outcome = NA,
+                                   outcome = NA,
                                    a_advertisement = lapply(1:pop_size, function(x){c(priors[1], 0)}),
                                    a_negotiation = lapply(1:pop_size, function(x){c(priors[2], 0)}),
                                    n_advertisement = lapply(1:pop_size, function(x){c(n, n)}),
@@ -164,20 +168,20 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0),
     #iterate through duos
     coord_game_results <- lapply(1:nrow(duos), function(j){
       #get actually played outcomes for a and b
-      neg_outcome_a <- coord_game(as.numeric(agents[duos[j, 1], 2:3]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, actual = TRUE, power_weighted = power_weighted)
-      neg_outcome_b <- coord_game(as.numeric(agents[duos[j, 2], 2:3]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, actual = TRUE, power_weighted = power_weighted)
+      outcome_a <- coord_game(as.numeric(agents[duos[j, 1], 2:3]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)[1]
+      outcome_b <- coord_game(as.numeric(agents[duos[j, 2], 2:3]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)[1]
       
       #calculate payoffs for advertisement
-      advertisement_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
-      advertisement_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+      advertisement_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)[2]})
+      advertisement_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)[2]})
       
       #solve EWA for advertisement (note that cum and imm come from opponent, so opposite index of a, n, and strat_used)
       advertisement_ewa_a <- ewa(a = agents$a_advertisement[[duos[j, 1]]], n = agents$n_advertisement[[duos[j, 1]]], strat_used = agents$advertisement[duos[j, 1]] + 1, pi = advertisement_payoffs_a, kappa = kappa, lambda = lambda, cum = agents$cum_advertisement[[duos[j, 2]]]/(i - 1), imm = `if`(agents$advertisement[duos[j, 2]] == 0, c(1, 0), c(0, 1)))
       advertisement_ewa_b <- ewa(a = agents$a_advertisement[[duos[j, 2]]], n = agents$n_advertisement[[duos[j, 2]]], strat_used = agents$advertisement[duos[j, 2]] + 1, pi = advertisement_payoffs_b, kappa = kappa, lambda = lambda, cum = agents$cum_advertisement[[duos[j, 1]]]/(i - 1), imm = `if`(agents$advertisement[duos[j, 1]] == 0, c(1, 0), c(0, 1)))
       
       #calculate payoffs for negotiation
-      negotiation_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], x), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)})
-      negotiation_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 2]], x), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)})
+      negotiation_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], x), agents$pref[duos[j, 1]], duos[j, 1], duos[j, 2], status_quo, neg_cost, agents, power_weighted = power_weighted)[2]})
+      negotiation_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 2]], x), agents$pref[duos[j, 2]], duos[j, 2], duos[j, 1], status_quo, neg_cost, agents, power_weighted = power_weighted)[2]})
       
       #solve EWA for negotiation (note that cum and imm come from opponent, so opposite index of a, n, and strat_used)
       negotiation_ewa_a <- ewa(a = agents$a_negotiation[[duos[j, 1]]], n = agents$n_negotiation[[duos[j, 1]]], strat_used = agents$negotiation[duos[j, 1]] + 1, pi = negotiation_payoffs_a, kappa = kappa, lambda = lambda, cum = agents$cum_negotiation[[duos[j, 2]]]/(i - 1), imm = `if`(agents$negotiation[duos[j, 2]] == 0, c(1, 0), c(0, 1)))
@@ -193,13 +197,13 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0),
       
       #return objects
       return(list(a = list(pref_strats = pref_strats_a,
-                           neg_outcome = neg_outcome_a,
+                           outcome = outcome_a,
                            advertisement_a = advertisement_ewa_a$a,
                            negotiation_a = negotiation_ewa_a$a,
                            advertisement_n = advertisement_ewa_a$n,
                            negotiation_n = negotiation_ewa_a$n),
                   b = list(pref_strats = pref_strats_b,
-                           neg_outcome = neg_outcome_b,
+                           outcome = outcome_b,
                            advertisement_a = advertisement_ewa_b$a,
                            negotiation_a = negotiation_ewa_b$a,
                            advertisement_n = advertisement_ewa_b$n,
@@ -239,8 +243,8 @@ model <- function(pop_size, t, status_quo = 1, priors = c(0, 0),
                                                  lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$negotiation_n}))
     
     #overwrite actually played outcomes
-    agents$neg_outcome[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$neg_outcome}),
-                                               lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$neg_outcome}))
+    agents$outcome[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$outcome}),
+                                           lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$outcome}))
     
     #remove objects
     rm(list = c("duos", "coord_game_results", "pref_strats"))
