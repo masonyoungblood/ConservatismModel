@@ -9,7 +9,7 @@ pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("funct
 
 #set parameters
 pop_size <- 10000
-t <- 50
+t <- 100
 neg_costs <- seq(0, 1, 0.1)
 n_moves <- seq(2, 12, 1)
 
