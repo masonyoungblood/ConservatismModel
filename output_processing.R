@@ -8,8 +8,8 @@ library(data.table)
 models <- c("full", "net")
 
 #set parameters
-pop_size <- 10000
-t <- 50
+pop_size <- 5000
+t <- 100
 neg_costs <- seq(0, 1, 0.1)
 n_moves <- seq(2, 12, 1)
 
