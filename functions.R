@@ -183,15 +183,11 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
       outcome_a <- coord_game(c(agents$advertisement[duos[j, 1]], agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], agents$status_quo[duos[j, 1]], duos[j, 1], duos[j, 2], neg_cost, agents, power_weighted = power_weighted)[1]
       outcome_b <- coord_game(c(agents$advertisement[duos[j, 2]], agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], agents$status_quo[duos[j, 2]], duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)[1]
       
-      #if person a is an advertiser, calculate payoffs and solve ewa for status quo move
-      if(agents$advertisement[duos[j, 1]] == 1){
+      #if person a and b are advertisers, calculate payoffs and solve ewa for status quo move
+      if(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1){
         status_quo_payoffs_a <- sapply(1:n_moves, function(x){coord_game(c(agents$advertisement[duos[j, 1]], agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], x, duos[j, 1], duos[j, 2], neg_cost, agents, power_weighted = power_weighted)[2]})
         status_quo_ewa_a <- ewa(a = agents$a_status_quo[[duos[j, 1]]], n = agents$n_status_quo[[duos[j, 1]]], strat_used = agents$status_quo[duos[j, 1]], pi = status_quo_payoffs_a, kappa = kappa, lambda = lambda, 
                                 cum = agents$cum_status_quo[[duos[j, 2]]], imm = c(rep(0, agents$status_quo[duos[j, 2]] - 1), 1, rep(0, n_moves - agents$status_quo[duos[j, 2]])), gamma = gamma, freqs = freq_table)
-      }
-      
-      #if person b is an advertiser, calculate payoffs and solve ewa for status quo move
-      if(agents$advertisement[duos[j, 2]] == 1){
         status_quo_payoffs_b <- sapply(1:n_moves, function(x){coord_game(c(agents$advertisement[duos[j, 2]], agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], x, duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)[2]})
         status_quo_ewa_b <- ewa(a = agents$a_status_quo[[duos[j, 2]]], n = agents$n_status_quo[[duos[j, 2]]], strat_used = agents$status_quo[duos[j, 2]], pi = status_quo_payoffs_b, kappa = kappa, lambda = lambda, 
                                 cum = agents$cum_status_quo[[duos[j, 1]]], imm = c(rep(0, agents$status_quo[duos[j, 1]] - 1), 1, rep(0, n_moves - agents$status_quo[duos[j, 1]])), gamma = gamma, freqs = freq_table)
@@ -214,30 +210,30 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
       negotiation_ewa_b <- ewa(a = agents$a_negotiation[[duos[j, 2]]], n = agents$n_negotiation[[duos[j, 2]]], strat_used = agents$negotiation[duos[j, 2]] + 1, pi = negotiation_payoffs_b, kappa = kappa, lambda = lambda, cum = agents$cum_negotiation[[duos[j, 1]]], imm = `if`(agents$negotiation[duos[j, 1]] == 0, c(1, 0), c(0, 1)))
       
       #sample new status quo and strategies for agent a
-      pref_strats_a <- c(ifelse(agents$advertisement[duos[j, 1]] == 1, sample(1:n_moves, 1, prob = status_quo_ewa_a$probs), agents$status_quo[duos[j, 1]]),
+      pref_strats_a <- c(ifelse(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, sample(1:n_moves, 1, prob = status_quo_ewa_a$probs), agents$status_quo[duos[j, 1]]),
                          sample(c(0, 1), 1, prob = advertisement_ewa_a$probs),
                          sample(c(0, 1), 1, prob = negotiation_ewa_a$probs))
       
       #sample new status quo and strategies for agent b
-      pref_strats_b <- c(ifelse(agents$advertisement[duos[j, 2]] == 1, sample(1:n_moves, 1, prob = status_quo_ewa_b$probs), agents$status_quo[duos[j, 2]]),
+      pref_strats_b <- c(ifelse(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, sample(1:n_moves, 1, prob = status_quo_ewa_b$probs), agents$status_quo[duos[j, 2]]),
                          sample(c(0, 1), 1, prob = advertisement_ewa_b$probs),
                          sample(c(0, 1), 1, prob = negotiation_ewa_b$probs))
       
       #return objects
       return(list(a = list(pref_strats = pref_strats_a,
                            outcome = outcome_a,
-                           status_quo_a = `if`(agents$advertisement[duos[j, 1]] == 1, status_quo_ewa_a$a, agents$a_status_quo[[duos[j, 1]]]),
+                           status_quo_a = `if`(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_a$a, agents$a_status_quo[[duos[j, 1]]]),
                            advertisement_a = advertisement_ewa_a$a,
                            negotiation_a = negotiation_ewa_a$a,
-                           status_quo_n = `if`(agents$advertisement[duos[j, 1]] == 1, status_quo_ewa_a$n, agents$n_status_quo[[duos[j, 1]]]),
+                           status_quo_n = `if`(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_a$n, agents$n_status_quo[[duos[j, 1]]]),
                            advertisement_n = advertisement_ewa_a$n,
                            negotiation_n = negotiation_ewa_a$n),
                   b = list(pref_strats = pref_strats_b,
                            outcome = outcome_b,
-                           status_quo_a = `if`(agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_b$a, agents$a_status_quo[[duos[j, 2]]]),
+                           status_quo_a = `if`(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_b$a, agents$a_status_quo[[duos[j, 2]]]),
                            advertisement_a = advertisement_ewa_b$a,
                            negotiation_a = negotiation_ewa_b$a,
-                           status_quo_n = `if`(agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_b$n, agents$n_status_quo[[duos[j, 2]]]),
+                           status_quo_n = `if`(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_b$n, agents$n_status_quo[[duos[j, 2]]]),
                            advertisement_n = advertisement_ewa_b$n,
                            negotiation_n = negotiation_ewa_b$n)))
     })
