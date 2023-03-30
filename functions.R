@@ -64,12 +64,9 @@ observation <- function(n, phi = 0, kappa = 0){(phi*(1 - kappa)*n) + 1}
 #EWA attraction function
 attraction <- function(a, n, phi, delta, i, pi, kappa){(phi*n*a + (delta + (1 - delta)*i)*pi)/observation(n, phi, kappa)}
 
-#EWA softmax function
-softmax <- function(a, a_all, lambda){exp(lambda*a)/sum(exp(lambda*a_all))}
-
 #self-tuning EWA function, which requires current attraction and payoff of both strategies: 10.1016/j.jet.2005.12.008
 #modified to include social information, when frequencies are supplied (only for status quo moves): 10.1098/rstb.2008.0131
-ewa <- function(a, n, strat_used, pi, kappa, lambda, cum, imm, gamma = NULL, freqs = NULL){
+ewa <- function(a, n, strat_used, pi, kappa, lambda, cum, imm, gamma = 0, counts, f = 1){
   #if strat_used is a single number, convert to vector (0 if wasn't played, 1 if was played)
   if(length(strat_used) == 1){
     temp <- rep(0, length(a))
@@ -84,14 +81,13 @@ ewa <- function(a, n, strat_used, pi, kappa, lambda, cum, imm, gamma = NULL, fre
   deltas <- sapply(1:length(a), function(x){ifelse(pi[x] >= pi[which(strat_used == 1)], 1, 0)})
 
   #update attractions based on payoffs (pi), using social information if frequencies are supplied
-  if(is.null(freqs)){a_new <- sapply(1:length(a), function(x){attraction(a[x], n[x], phi, deltas[x], strat_used[x], pi[x], kappa)})}
-  if(!is.null(freqs)){a_new <- sapply(1:length(a), function(x){((1 - gamma)*attraction(a[x], n[x], phi, deltas[x], strat_used[x], pi[x], kappa)) + (gamma*freqs[x])})}
+  a_new <- sapply(1:length(a), function(x){attraction(a[x], n[x], phi, deltas[x], strat_used[x], pi[x], kappa)})
 
   #update (local) n's
   n_new <- sapply(1:length(a), function(x){observation(n[x], phi, kappa)})
 
   #get probabilities based on new attractions
-  probs <- sapply(1:length(a), function(x){softmax(a_new[x], a_new, lambda)})
+  probs <- sapply(1:length(a), function(x){(1 - gamma)*(exp(lambda*a_new[x])/sum(exp(lambda*a_new))) + (gamma*((counts[x]^f)/(sum(counts^f))))})
 
   #return everything in a named list
   return(list(a = a_new, n = n_new, probs = probs))
@@ -125,7 +121,7 @@ network_sampler <- function(pop_structure){
   #lambda (randomness in softmax, where 0 is completely random and larger values are more deterministic)
 model <- function(pop_size, t, priors = c(0, 0, 0),
                   n_moves = 4, default_strat = c(0, 0), out_of = 1,
-                  neg_cost = 0, n = 1, kappa = 0, lambda = 50, gamma = 0,
+                  neg_cost = 0, n = 1, kappa = 0, lambda = 50, gamma = 0, f = 1,
                   networked = FALSE, power_weighted = FALSE, supply_agents = NULL, last_output = FALSE){
   if(is.null(supply_agents)){
     #initialize population of agents
@@ -176,8 +172,9 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
     }
 
     #store frequency table of status quo moves in case it's needed
-    freq_table <- as.numeric(table(factor(agents$status_quo, levels = c(1:n_moves))))
-    freq_table <- freq_table/sum(freq_table)
+    sq_counts <- as.numeric(table(factor(agents$status_quo, levels = c(1:n_moves))))
+    adv_counts <- as.numeric(table(factor(agents$advertisement, levels = c(0, 1))))
+    neg_counts <- as.numeric(table(factor(agents$negotiation, levels = c(0, 1))))
 
     #iterate through duos
     coord_game_results <- lapply(1:nrow(duos), function(j){
@@ -189,10 +186,10 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
       if(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1){
         status_quo_payoffs_a <- sapply(1:n_moves, function(x){coord_game(c(agents$advertisement[duos[j, 1]], agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], x, duos[j, 1], duos[j, 2], neg_cost, agents, power_weighted = power_weighted)[2]})
         status_quo_ewa_a <- ewa(a = agents$a_status_quo[[duos[j, 1]]], n = agents$n_status_quo[[duos[j, 1]]], strat_used = agents$status_quo[duos[j, 1]], pi = status_quo_payoffs_a, kappa = kappa, lambda = lambda,
-                                cum = agents$cum_status_quo[[duos[j, 2]]], imm = c(rep(0, agents$status_quo[duos[j, 2]] - 1), 1, rep(0, n_moves - agents$status_quo[duos[j, 2]])), gamma = gamma, freqs = freq_table)
+                                cum = agents$cum_status_quo[[duos[j, 2]]], imm = c(rep(0, agents$status_quo[duos[j, 2]] - 1), 1, rep(0, n_moves - agents$status_quo[duos[j, 2]])), gamma = gamma, counts = sq_counts, f = f)
         status_quo_payoffs_b <- sapply(1:n_moves, function(x){coord_game(c(agents$advertisement[duos[j, 2]], agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], x, duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)[2]})
         status_quo_ewa_b <- ewa(a = agents$a_status_quo[[duos[j, 2]]], n = agents$n_status_quo[[duos[j, 2]]], strat_used = agents$status_quo[duos[j, 2]], pi = status_quo_payoffs_b, kappa = kappa, lambda = lambda,
-                                cum = agents$cum_status_quo[[duos[j, 1]]], imm = c(rep(0, agents$status_quo[duos[j, 1]] - 1), 1, rep(0, n_moves - agents$status_quo[duos[j, 1]])), gamma = gamma, freqs = freq_table)
+                                cum = agents$cum_status_quo[[duos[j, 1]]], imm = c(rep(0, agents$status_quo[duos[j, 1]] - 1), 1, rep(0, n_moves - agents$status_quo[duos[j, 1]])), gamma = gamma, counts = sq_counts, f = f)
       }
 
       #calculate payoffs for advertisement
@@ -200,16 +197,20 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
       advertisement_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(x, agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], agents$status_quo[duos[j, 2]], duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)[2]})
 
       #solve EWA for advertisement (note that cum and imm come from opponent, so opposite index of a, n, and strat_used)
-      advertisement_ewa_a <- ewa(a = agents$a_advertisement[[duos[j, 1]]], n = agents$n_advertisement[[duos[j, 1]]], strat_used = agents$advertisement[duos[j, 1]] + 1, pi = advertisement_payoffs_a, kappa = kappa, lambda = lambda, cum = agents$cum_advertisement[[duos[j, 2]]], imm = `if`(agents$advertisement[duos[j, 2]] == 0, c(1, 0), c(0, 1)))
-      advertisement_ewa_b <- ewa(a = agents$a_advertisement[[duos[j, 2]]], n = agents$n_advertisement[[duos[j, 2]]], strat_used = agents$advertisement[duos[j, 2]] + 1, pi = advertisement_payoffs_b, kappa = kappa, lambda = lambda, cum = agents$cum_advertisement[[duos[j, 1]]], imm = `if`(agents$advertisement[duos[j, 1]] == 0, c(1, 0), c(0, 1)))
+      advertisement_ewa_a <- ewa(a = agents$a_advertisement[[duos[j, 1]]], n = agents$n_advertisement[[duos[j, 1]]], strat_used = agents$advertisement[duos[j, 1]] + 1, pi = advertisement_payoffs_a, kappa = kappa, lambda = lambda,
+                                 cum = agents$cum_advertisement[[duos[j, 2]]], imm = `if`(agents$advertisement[duos[j, 2]] == 0, c(1, 0), c(0, 1)), gamma = gamma, counts = adv_counts, f = f)
+      advertisement_ewa_b <- ewa(a = agents$a_advertisement[[duos[j, 2]]], n = agents$n_advertisement[[duos[j, 2]]], strat_used = agents$advertisement[duos[j, 2]] + 1, pi = advertisement_payoffs_b, kappa = kappa, lambda = lambda,
+                                 cum = agents$cum_advertisement[[duos[j, 1]]], imm = `if`(agents$advertisement[duos[j, 1]] == 0, c(1, 0), c(0, 1)), gamma = gamma, counts = adv_counts, f = f)
 
       #calculate payoffs for negotiation
       negotiation_payoffs_a <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 1]], x), agents$pref[duos[j, 1]], agents$status_quo[duos[j, 1]], duos[j, 1], duos[j, 2], neg_cost, agents, power_weighted = power_weighted)[2]})
       negotiation_payoffs_b <- sapply(c(0, 1), function(x){coord_game(c(agents$advertisement[duos[j, 2]], x), agents$pref[duos[j, 2]], agents$status_quo[duos[j, 2]], duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)[2]})
 
       #solve EWA for negotiation (note that cum and imm come from opponent, so opposite index of a, n, and strat_used)
-      negotiation_ewa_a <- ewa(a = agents$a_negotiation[[duos[j, 1]]], n = agents$n_negotiation[[duos[j, 1]]], strat_used = agents$negotiation[duos[j, 1]] + 1, pi = negotiation_payoffs_a, kappa = kappa, lambda = lambda, cum = agents$cum_negotiation[[duos[j, 2]]], imm = `if`(agents$negotiation[duos[j, 2]] == 0, c(1, 0), c(0, 1)))
-      negotiation_ewa_b <- ewa(a = agents$a_negotiation[[duos[j, 2]]], n = agents$n_negotiation[[duos[j, 2]]], strat_used = agents$negotiation[duos[j, 2]] + 1, pi = negotiation_payoffs_b, kappa = kappa, lambda = lambda, cum = agents$cum_negotiation[[duos[j, 1]]], imm = `if`(agents$negotiation[duos[j, 1]] == 0, c(1, 0), c(0, 1)))
+      negotiation_ewa_a <- ewa(a = agents$a_negotiation[[duos[j, 1]]], n = agents$n_negotiation[[duos[j, 1]]], strat_used = agents$negotiation[duos[j, 1]] + 1, pi = negotiation_payoffs_a, kappa = kappa, lambda = lambda,
+                               cum = agents$cum_negotiation[[duos[j, 2]]], imm = `if`(agents$negotiation[duos[j, 2]] == 0, c(1, 0), c(0, 1)), gamma = gamma, counts = neg_counts, f = f)
+      negotiation_ewa_b <- ewa(a = agents$a_negotiation[[duos[j, 2]]], n = agents$n_negotiation[[duos[j, 2]]], strat_used = agents$negotiation[duos[j, 2]] + 1, pi = negotiation_payoffs_b, kappa = kappa, lambda = lambda,
+                               cum = agents$cum_negotiation[[duos[j, 1]]], imm = `if`(agents$negotiation[duos[j, 1]] == 0, c(1, 0), c(0, 1)), gamma = gamma, counts = neg_counts, f = f)
 
       #sample new status quo and strategies for agent a
       pref_strats_a <- c(ifelse(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, sample(1:n_moves, 1, prob = status_quo_ewa_a$probs), agents$status_quo[duos[j, 1]]),
