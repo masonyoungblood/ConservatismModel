@@ -69,7 +69,7 @@ disrupt_model_slurm <- function(base, props, cost, moves, gamma, f, networked){
   object <- rbind(object[1:(n-pop_size), ], agents)
 
   #run new simulations and store simplified output
-  output <- model(pop_size = n, t = t_2, neg_cost = cost, n_moves = moves, supply_agents = object, gamma = gamma, f = f, networked = networked, simple_output = TRUE)
+  output <- model(pop_size = n, t = t_2, neg_cost = cost, n_moves = moves, supply_agents = object, gamma = gamma, f = f, networked = networked)
   c(base_freqs, sapply(1:t_2, function(y){length(which(output[[y]]$status_quo == status_quo))/n}))
 }
 
@@ -83,6 +83,7 @@ base_job <- rslurm::slurm_apply(base_model_slurm, base_params, jobname = "base_m
 
 #store base output for disruption model
 base_output <- rslurm::get_slurm_out(base_job)
+rslurm::cleanup_files(base_job)
 
 #run disruption model
 disrupt_job <- rslurm::slurm_apply(disrupt_model_slurm, disrupt_params, jobname = "disrupt_model",
