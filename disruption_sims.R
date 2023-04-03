@@ -77,7 +77,7 @@ disrupt_model_slurm <- function(base, props, cost, moves, gamma, f, networked){
 set.seed(123)
 
 #run base model
-base_job <- rslurm::slurm_apply(model_slurm, params, jobname = "base_model",
+base_job <- rslurm::slurm_apply(base_model_slurm, params, jobname = "base_model",
                                 nodes = 1, cpus_per_node = 4, pkgs = pkgs,
                                 global_objects = objects(), slurm_options = list(mem = "100G"))
 
@@ -85,6 +85,6 @@ base_job <- rslurm::slurm_apply(model_slurm, params, jobname = "base_model",
 base_output <- get_slurm_out(base_job)
 
 #run disruption model
-disrupt_job <- rslurm::slurm_apply(model_slurm, params, jobname = "disrupt_model",
+disrupt_job <- rslurm::slurm_apply(disrupt_model_slurm, params, jobname = "disrupt_model",
                                    nodes = 1, cpus_per_node = 36, pkgs = pkgs,
                                    global_objects = objects(), slurm_options = list(mem = "100G"))
