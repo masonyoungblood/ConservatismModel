@@ -8,7 +8,7 @@ source("functions.R")
 pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
-n <- 10
+n <- 100
 t <- 2000
 t_2 <- 200
 cost <- c(0.5, 0.5, 0.5, 0.5)
@@ -70,7 +70,7 @@ disrupt_model_slurm <- function(base, props, cost, moves, gamma, f, networked){
 
   #run new simulations and store simplified output
   output <- model(pop_size = n, t = t_2, neg_cost = cost, n_moves = moves, supply_agents = object, gamma = gamma, f = f, networked = networked, simple_output = TRUE)
-  list(base_freqs = base_freqs, disrupt_freqs = do.call(rbind, lapply(1:length(output), function(y){output[[y]][[1]]})))
+  c(base_freqs, sapply(1:t_2, function(y){length(which(output[[y]]$status_quo == status_quo))/n}))
 }
 
 #set seed
@@ -82,7 +82,7 @@ base_job <- rslurm::slurm_apply(base_model_slurm, base_params, jobname = "base_m
                                 global_objects = objects(), slurm_options = list(mem = "100G"))
 
 #store base output for disruption model
-base_output <- get_slurm_out(base_job)
+base_output <- rslurm::get_slurm_out(base_job)
 
 #run disruption model
 disrupt_job <- rslurm::slurm_apply(disrupt_model_slurm, disrupt_params, jobname = "disrupt_model",
