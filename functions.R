@@ -122,7 +122,7 @@ network_sampler <- function(pop_structure){
 model <- function(pop_size, t, priors = c(0, 0, 0),
                   n_moves = 4, default_strat = c(0, 0), out_of = 1,
                   neg_cost = 0, n = 1, kappa = 0, lambda = 50, gamma = 0, f = 1,
-                  networked = FALSE, power_weighted = FALSE, supply_agents = NULL, last_output = FALSE){
+                  networked = FALSE, power_weighted = FALSE, supply_agents = NULL, last_output = FALSE, simple_output = FALSE){
   if(is.null(supply_agents)){
     #initialize population of agents
     agents <- data.table::data.table(pref = NA,
@@ -152,7 +152,15 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
   #create output object
   if(!last_output){
     output <- list()
-    output[[1]] <- agents
+    if(!simple_output){output[[1]] <- agents}
+    if(simple_output){
+      output[[1]] <- list(
+        as.numeric(table(factor(agents$status_quo, levels = c(1:n_moves)))),
+        c(length(which(agents$advertisement == 0 & agents$negotiation == 0)),
+          length(which(agents$advertisement == 1 & agents$negotiation == 0)),
+          length(which(agents$advertisement == 0 & agents$negotiation == 1)),
+          length(which(agents$advertisement == 1 & agents$negotiation == 1))))
+    }
   }
 
   #if networked = TRUE, then generate a scale free network (m = 5 leads to mean degree of 10), and set seed so network is consistent across iterations
@@ -308,7 +316,17 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
     rm(list = c("duos", "coord_game_results", "pref_strats"))
 
     #store output
-    if(!last_output){output[[i]] <- agents}
+    if(!last_output){
+      if(!simple_output){output[[i]] <- agents}
+      if(simple_output){
+        output[[i]] <- list(
+          as.numeric(table(factor(agents$status_quo, levels = c(1:n_moves)))),
+          c(length(which(agents$advertisement == 0 & agents$negotiation == 0)),
+            length(which(agents$advertisement == 1 & agents$negotiation == 0)),
+            length(which(agents$advertisement == 0 & agents$negotiation == 1)),
+            length(which(agents$advertisement == 1 & agents$negotiation == 1))))
+      }
+    }
   }
 
   #return output
