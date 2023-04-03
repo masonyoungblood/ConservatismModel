@@ -26,7 +26,7 @@ disrupt_params <- data.frame(base = rep(1:length(cost), each = length(props)), p
 rm(list = c("cost", "moves", "gamma", "f", "networked", "props"))
 
 #wrarp base model for slurm
-base_model_slurm <- function(cost, moves, gamma, f, networked){model(pop_size = pop_size, t = t, neg_cost = cost, n_moves = moves, gamma = gamma, f = f, networked = networked)}
+base_model_slurm <- function(cost, moves, gamma, f, networked){model(pop_size = n, t = t, neg_cost = cost, n_moves = moves, gamma = gamma, f = f, networked = networked)}
 
 #wrap distruption model for slurm
 disrupt_model_slurm <- function(base, props, cost, moves, gamma, f, networked){
