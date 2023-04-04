@@ -8,8 +8,8 @@ source("functions.R")
 pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
-n <- 10
-t <- 10
+n <- 10000
+t <- 2000
 t_2 <- 200
 cost <- c(0.5, 0.5, 0.5, 0.5)
 moves <- c(2, 2, 2, 2)
