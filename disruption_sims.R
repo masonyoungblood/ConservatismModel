@@ -8,8 +8,8 @@ source("functions.R")
 pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
-n <- 100
-t <- 2000
+n <- 10
+t <- 10
 t_2 <- 200
 cost <- c(0.5, 0.5, 0.5, 0.5)
 moves <- c(2, 2, 2, 2)
@@ -20,18 +20,18 @@ props <- seq(0.1, 0.9, by = 0.1)
 
 #put parameters into data frame format for slurm
 base_params <- data.frame(cost = cost, moves = moves, gamma = gamma, f = f, networked = networked)
-disrupt_params <- data.frame(base = rep(1:length(cost), each = length(props)), props = rep(props, length(cost)), cost = rep(cost, each = length(props)), moves = rep(moves, each = length(props)), gamma = rep(gamma, each = length(props)), f = rep(f, each = length(props)), networked = rep(networked, each = length(props)))
+disrupt_params <- data.frame(model = rep(1:length(cost), each = length(props)), props = rep(props, length(cost)), cost = rep(cost, each = length(props)), moves = rep(moves, each = length(props)), gamma = rep(gamma, each = length(props)), f = rep(f, each = length(props)), networked = rep(networked, each = length(props)))
 
 #remove original parameter objects
 rm(list = c("cost", "moves", "gamma", "f", "networked", "props"))
 
-#wrarp base model for slurm
+#wrap base model for slurm
 base_model_slurm <- function(cost, moves, gamma, f, networked){model(pop_size = n, t = t, neg_cost = cost, n_moves = moves, gamma = gamma, f = f, networked = networked)}
 
 #wrap distruption model for slurm
-disrupt_model_slurm <- function(base, props, cost, moves, gamma, f, networked){
+disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
   #store base model and compute status quo
-  base <- base_output[[base]]
+  base <- base_output[[model]]
   status_quo <- which.max(as.numeric(table(factor(base[[t]]$status_quo, levels = 1:moves))))
 
   #get frequency of previous status quo
