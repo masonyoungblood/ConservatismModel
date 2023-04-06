@@ -44,7 +44,7 @@ disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
   status_quo <- which.max(base[[1]][t, ])
 
   #get frequency of previous status quo
-  base_freqs <- base[[1]][, status_quo]
+  base_freqs <- base[[1]][, status_quo]/n
 
   #store new status quo
   object <- base[[2]]
