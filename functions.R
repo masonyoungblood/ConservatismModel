@@ -140,7 +140,8 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
                                      n_negotiation = lapply(1:pop_size, function(x){c(n, n)}),
                                      cum_status_quo = lapply(1:pop_size, function(x){rep(0, n_moves)}),
                                      cum_advertisement = lapply(1:pop_size, function(x){c(0, 0)}),
-                                     cum_negotiation = lapply(1:pop_size, function(x){c(0, 0)}))
+                                     cum_negotiation = lapply(1:pop_size, function(x){c(0, 0)}),
+                                     lifetime_payoff = 0)
 
     #overwrite preferred moves to be highest payoff moves
     agents$pref <- sapply(1:pop_size, function(x){which.max(diag(agents$payoffs[[x]]))})
@@ -200,9 +201,13 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
 
     #iterate through duos
     coord_game_results <- lapply(1:nrow(duos), function(j){
-      #get actually played outcomes for a and b
-      outcome_a <- coord_game(c(agents$advertisement[duos[j, 1]], agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], agents$status_quo[duos[j, 1]], duos[j, 1], duos[j, 2], neg_cost, agents, power_weighted = power_weighted)[1]
-      outcome_b <- coord_game(c(agents$advertisement[duos[j, 2]], agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], agents$status_quo[duos[j, 2]], duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)[1]
+      #get actually played outcomes and payoffs for a and b
+      outcome_a <- coord_game(c(agents$advertisement[duos[j, 1]], agents$negotiation[duos[j, 1]]), agents$pref[duos[j, 1]], agents$status_quo[duos[j, 1]], duos[j, 1], duos[j, 2], neg_cost, agents, power_weighted = power_weighted)
+      outcome_b <- coord_game(c(agents$advertisement[duos[j, 2]], agents$negotiation[duos[j, 2]]), agents$pref[duos[j, 2]], agents$status_quo[duos[j, 2]], duos[j, 2], duos[j, 1], neg_cost, agents, power_weighted = power_weighted)
+      payoff_a <- outcome_a[2]
+      payoff_b <- outcome_b[2]
+      outcome_a <- outcome_a[1]
+      outcome_b <- outcome_b[1]
 
       #if person a and b are advertisers, calculate payoffs and solve ewa for status quo move
       if(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1){
@@ -247,6 +252,7 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
       #return objects
       return(list(a = list(pref_strats = pref_strats_a,
                            outcome = outcome_a,
+                           payoff = payoff_a,
                            status_quo_a = `if`(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_a$a, agents$a_status_quo[[duos[j, 1]]]),
                            advertisement_a = advertisement_ewa_a$a,
                            negotiation_a = negotiation_ewa_a$a,
@@ -255,6 +261,7 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
                            negotiation_n = negotiation_ewa_a$n),
                   b = list(pref_strats = pref_strats_b,
                            outcome = outcome_b,
+                           payoff = payoff_b,
                            status_quo_a = `if`(agents$advertisement[duos[j, 1]] == 1 & agents$advertisement[duos[j, 2]] == 1, status_quo_ewa_b$a, agents$a_status_quo[[duos[j, 2]]]),
                            advertisement_a = advertisement_ewa_b$a,
                            negotiation_a = negotiation_ewa_b$a,
@@ -309,8 +316,13 @@ model <- function(pop_size, t, priors = c(0, 0, 0),
                                                  lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$negotiation_n}))
 
     #overwrite actually played outcomes
-    agents$outcome[c(duos$x, duos$y)] <- c(lapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$outcome}),
-                                           lapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$outcome}))
+    agents$outcome[c(duos$x, duos$y)] <- c(sapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$outcome}),
+                                           sapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$outcome}))
+
+    #add actually received payoffs to cumulative lifetime payoffs
+    agents$lifetime_payoff[c(duos$x, duos$y)] <- agents$lifetime_payoff[c(duos$x, duos$y)] +
+      c(sapply(1:nrow(duos), function(x){coord_game_results[[x]]$a$payoff}),
+        sapply(1:nrow(duos), function(x){coord_game_results[[x]]$b$payoff}))
 
     #remove objects
     rm(list = c("duos", "coord_game_results", "pref_strats"))

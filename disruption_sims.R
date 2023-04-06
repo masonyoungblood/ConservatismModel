@@ -26,23 +26,32 @@ disrupt_params <- data.frame(model = rep(1:length(cost), each = length(props)), 
 rm(list = c("cost", "moves", "gamma", "f", "networked", "props"))
 
 #wrap base model for slurm
-base_model_slurm <- function(cost, moves, gamma, f, networked){model(pop_size = n, t = t, neg_cost = cost, n_moves = moves, gamma = gamma, f = f, networked = networked)}
+base_model_slurm <- function(cost, moves, gamma, f, networked){
+  #collect the full output
+  full_output <- model(pop_size = n, t = t, neg_cost = cost, n_moves = moves, gamma = gamma, f = f, networked = networked)
 
-#wrap distruption model for slurm
+  #compute the frequency of status quo moves in each timestep and combine into a matrix
+  sq_freqs <- do.call(rbind, lapply(1:length(full_output), function(m){as.numeric(table(factor(full_output[[m]]$status_quo, levels = 1:moves)))}))
+
+  #return the frequencies and the final timestep of agents
+  return(list(sq_freqs, full_output[[t]]))
+}
+
+#wrap disruption model for slurm
 disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
   #store base model and compute status quo
   base <- base_output[[model]]
-  status_quo <- which.max(as.numeric(table(factor(base[[t]]$status_quo, levels = 1:moves))))
+  status_quo <- which.max(base[[1]][t, ])
 
   #get frequency of previous status quo
-  base_freqs <- sapply(1:t, function(y){length(which(base[[y]]$status_quo == status_quo))/n})
+  base_freqs <- base[[1]][, status_quo]
 
   #store new status quo
-  object <- base[[t]]
+  object <- base[[2]]
   if(moves == 2){
-    new_status_quo <- c(1:moves)[-which.max(as.numeric(table(factor(object$status_quo, levels = 1:moves))))]
+    new_status_quo <- c(1:moves)[-status_quo]
   } else{
-    new_status_quo <- sample(c(1:moves)[-which.max(as.numeric(table(factor(object$status_quo, levels = 1:moves))))], 1)
+    new_status_quo <- sample(c(1:moves)[-status_quo], 1)
   }
 
   #create table of fresh agents
@@ -79,7 +88,7 @@ set.seed(123)
 #run base model
 base_job <- rslurm::slurm_apply(base_model_slurm, base_params, jobname = "base_model",
                                 nodes = 1, cpus_per_node = 4, pkgs = pkgs,
-                                global_objects = objects(), slurm_options = list(mem = "100G"))
+                                global_objects = objects(), slurm_options = list(mem = "150G"))
 
 #store base output for disruption model
 base_output <- rslurm::get_slurm_out(base_job)
@@ -88,4 +97,4 @@ rslurm::cleanup_files(base_job)
 #run disruption model
 disrupt_job <- rslurm::slurm_apply(disrupt_model_slurm, disrupt_params, jobname = "disrupt_model",
                                    nodes = 1, cpus_per_node = 36, pkgs = pkgs,
-                                   global_objects = objects(), slurm_options = list(mem = "100G"))
+                                   global_objects = objects(), slurm_options = list(mem = "150G"))
