@@ -71,7 +71,8 @@ disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
                                    n_negotiation = lapply(1:pop_size, function(x){c(1, 1)}),
                                    cum_status_quo = lapply(1:pop_size, function(x){rep(0, moves)}),
                                    cum_advertisement = lapply(1:pop_size, function(x){c(0, 0)}),
-                                   cum_negotiation = lapply(1:pop_size, function(x){c(0, 0)}))
+                                   cum_negotiation = lapply(1:pop_size, function(x){c(0, 0)}),
+                                   lifetime_payoff = 0)
   agents$pref <- sapply(1:pop_size, function(x){which.max(diag(agents$payoffs[[x]]))})
 
   #overwrite proportion of existing agents with new agents
