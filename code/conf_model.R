@@ -1,4 +1,4 @@
-# FULL MODEL --------------------------------------------------------------
+# CONF MODEL ---------------------------------------------------------------
 
 #set working directory, load source code, libraries
 setwd(system("pwd", intern = T))
@@ -17,10 +17,8 @@ n_moves <- seq(2, 10, 1)
 params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
-#wrap model function for slurm
-model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, last_output = TRUE)}
-
-#run simulations
-rslurm::slurm_apply(model_slurm, params, jobname = "full_model",
-                    nodes = 1, cpus_per_node = 41, pkgs = pkgs,
-                    global_objects = objects(), slurm_options = list(mem = "200G"))
+#run conformist version of model and save output
+conf_model <- parallel::mclapply(1:nrow(params), function(x){
+  model(pop_size = pop_size, t = t, neg_cost = params$neg_costs[x], n_moves = params$n_moves[x], gamma = 0.25, f = 2.5, last_output = TRUE)
+}, mc.cores = parallel::detectCores() - 1)
+save(conf_model, file = "../data/conf_model.RData")

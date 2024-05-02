@@ -18,34 +18,37 @@ f <- c(0, 2.5, 0, 2.5)
 networked <- c(FALSE, FALSE, TRUE, TRUE)
 props <- seq(0.1, 0.9, by = 0.1)
 
-#put parameters into data frame format for slurm
+#put parameters into data frame
 base_params <- data.frame(cost = cost, moves = moves, gamma = gamma, f = f, networked = networked)
 disrupt_params <- data.frame(model = rep(1:length(cost), each = length(props)), props = rep(props, length(cost)), cost = rep(cost, each = length(props)), moves = rep(moves, each = length(props)), gamma = rep(gamma, each = length(props)), f = rep(f, each = length(props)), networked = rep(networked, each = length(props)))
 
 #remove original parameter objects
 rm(list = c("cost", "moves", "gamma", "f", "networked", "props"))
 
-#wrap base model for slurm
-base_model_slurm <- function(cost, moves, gamma, f, networked){
-  #collect the full output
-  full_output <- model(pop_size = n, t = t, neg_cost = cost, n_moves = moves, gamma = gamma, f = f, networked = networked)
+#set seed
+set.seed(123)
 
+#run base model code
+base_model <- parallel::mclapply(1:nrow(base_params), function(x){
+  #collect the full output
+  full_output <- model(pop_size = n, t = t, neg_cost = base_params$cost[x], n_moves = base_params$moves[x], gamma = base_params$gamma[x], f = base_params$f[x], networked = base_params$networked[x])
+  
   #compute the frequency of status quo moves in each timestep and combine into a matrix
   sq_freqs <- do.call(rbind, lapply(1:length(full_output), function(m){as.numeric(table(factor(full_output[[m]]$status_quo, levels = 1:moves)))}))
-
+  
   #return the frequencies and the final timestep of agents
   return(list(sq_freqs, full_output[[t]]))
-}
+}, mc.cores = parallel::detectCores() - 1)
 
-#wrap disruption model for slurm
-disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
+#run disrupt model code
+disrupt_model <- parallel::mclapply(1:nrow(disrupt_params), function(x){
   #store base model and compute status quo
-  base <- base_output[[model]]
+  base <- base_model[[disrupt_params$model[x]]]
   status_quo <- which.max(base[[1]][t, ])
-
+  
   #get frequency of previous status quo
   base_freqs <- base[[1]][, status_quo]/n
-
+  
   #store new status quo
   object <- base[[2]]
   if(moves == 2){
@@ -53,9 +56,9 @@ disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
   } else{
     new_status_quo <- sample(c(1:moves)[-status_quo], 1)
   }
-
+  
   #create table of fresh agents
-  pop_size <- n*props
+  pop_size <- n*disrupt_params$props[x]
   agents <- data.table::data.table(pref = NA,
                                    status_quo = new_status_quo,
                                    advertisement = 0,
@@ -74,28 +77,17 @@ disrupt_model_slurm <- function(model, props, cost, moves, gamma, f, networked){
                                    cum_negotiation = lapply(1:pop_size, function(x){c(0, 0)}),
                                    lifetime_payoff = 0)
   agents$pref <- sapply(1:pop_size, function(x){which.max(diag(agents$payoffs[[x]]))})
-
+  
   #overwrite proportion of existing agents with new agents
   object <- rbind(object[1:(n-pop_size), ], agents)
-
+  
+  disrupt_params <- data.frame(model = rep(1:length(cost), each = length(props)), props = rep(props, length(cost)), cost = rep(cost, each = length(props)), moves = rep(moves, each = length(props)), gamma = rep(gamma, each = length(props)), f = rep(f, each = length(props)), networked = rep(networked, each = length(props)))
+  
   #run new simulations and store simplified output
-  output <- model(pop_size = n, t = t_2, neg_cost = cost, n_moves = moves, supply_agents = object, gamma = gamma, f = f, networked = networked)
+  output <- model(pop_size = n, t = t_2, neg_cost = disrupt_params$cost[x], n_moves = disrupt_params$moves[x], supply_agents = object, gamma = disrupt_params$gamma[x], f = disrupt_params$f[x], networked = disrupt_params$networked[x])
   c(base_freqs, sapply(1:t_2, function(y){length(which(output[[y]]$status_quo == status_quo))/n}))
-}
+}, mc.cores = parallel::detectCores() - 1)
 
-#set seed
-set.seed(123)
-
-#run base model
-base_job <- rslurm::slurm_apply(base_model_slurm, base_params, jobname = "base_model",
-                                nodes = 1, cpus_per_node = 4, pkgs = pkgs,
-                                global_objects = objects(), slurm_options = list(mem = "150G"))
-
-#store base output for disruption model
-base_output <- rslurm::get_slurm_out(base_job)
-rslurm::cleanup_files(base_job)
-
-#run disruption model
-disrupt_job <- rslurm::slurm_apply(disrupt_model_slurm, disrupt_params, jobname = "disrupt_model",
-                                   nodes = 1, cpus_per_node = 36, pkgs = pkgs,
-                                   global_objects = objects(), slurm_options = list(mem = "150G"))
+#save output in named list
+disrupt_model <- list(base = base_model, disrupt = disrupt_model)
+save(disrupt_model, file = "../data/disrupt_model.RData")

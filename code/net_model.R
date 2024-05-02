@@ -17,10 +17,8 @@ n_moves <- seq(2, 10, 1)
 params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
                      n_moves = unlist(lapply(1:length(n_moves), function(x){rep(n_moves[x], length(neg_costs))})))
 
-#wrap model function for slurm
-model_slurm <- function(neg_costs, n_moves){model(pop_size = pop_size, t = t, neg_cost = neg_costs, n_moves = n_moves, networked = TRUE, last_output = TRUE)}
-
-#run simulations
-rslurm::slurm_apply(model_slurm, params, jobname = "net_model",
-                    nodes = 1, cpus_per_node = 41, pkgs = pkgs,
-                    global_objects = objects(), slurm_options = list(mem = "200G"))
+#run networked version of model and save
+net_model <- parallel::mclapply(1:nrow(params), function(x){
+  model(pop_size = pop_size, t = t, neg_cost = params$neg_costs[x], n_moves = params$n_moves[x], networked = TRUE, last_output = TRUE)
+}, mc.cores = parallel::detectCores() - 1)
+save(net_model, file = "../data/net_model.RData")
