@@ -2,10 +2,10 @@
 
 #set working directory, load source code, libraries
 setwd(system("pwd", intern = T))
-source("functions.R")
+source("code/functions.R")
 
 #store required packages
-pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
+pkgs <- unique(getParseData(parse("code/functions.R"))$text[getParseData(parse("code/functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
 pop_size <- 10000
@@ -21,4 +21,4 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
 net_model <- parallel::mclapply(1:nrow(params), function(x){
   model(pop_size = pop_size, t = t, neg_cost = params$neg_costs[x], n_moves = params$n_moves[x], networked = TRUE, last_output = TRUE)
 }, mc.cores = parallel::detectCores() - 1)
-save(net_model, file = "../data/net_model.RData")
+save(net_model, file = "data/net_model.RData")

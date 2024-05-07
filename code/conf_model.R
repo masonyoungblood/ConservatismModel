@@ -1,11 +1,11 @@
 # CONF MODEL ---------------------------------------------------------------
 
 #set working directory, load source code, libraries
-setwd(system("pwd", intern = T))
-source("functions.R")
+setwd("/gpfs/home/myoungblood/ConservatismModel")
+source("code/functions.R")
 
 #store required packages
-pkgs <- unique(getParseData(parse("functions.R"))$text[getParseData(parse("functions.R"))$token == "SYMBOL_PACKAGE"])
+pkgs <- unique(getParseData(parse("code/functions.R"))$text[getParseData(parse("code/functions.R"))$token == "SYMBOL_PACKAGE"])
 
 #set parameters
 pop_size <- 10000
@@ -21,4 +21,4 @@ params <- data.frame(neg_costs = rep(neg_costs, length(n_moves)),
 conf_model <- parallel::mclapply(1:nrow(params), function(x){
   model(pop_size = pop_size, t = t, neg_cost = params$neg_costs[x], n_moves = params$n_moves[x], gamma = 0.25, f = 2.5, last_output = TRUE)
 }, mc.cores = parallel::detectCores() - 1)
-save(conf_model, file = "../data/conf_model.RData")
+save(conf_model, file = "data/conf_model.RData")
