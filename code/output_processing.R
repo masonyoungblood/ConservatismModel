@@ -404,11 +404,11 @@ ind_arcs_sankey$node <- factor(ind_arcs_sankey$node, levels = c("00", "10", "01"
 ind_arcs_sankey$next_node <- factor(ind_arcs_sankey$next_node, levels = c("00", "10", "01", "11"))
 
 #combine timesteps into top panel
-top <- plot_grid(a + theme(legend.position = "none") + theme(axis.title.x = element_text(color = "white")),
-                 b + theme(legend.position = "none") + ylab(NULL),
-                 c + theme(legend.position = "none") + theme(axis.title.x = element_text(color = "white")) + ylab(NULL),
-                 xlabel(" "), get_legend(a), xlabel(" "),
-                 nrow = 2, rel_heights = c(1, 0.12), rel_widths = c(1.05, 1, 1))
+top <- plot_grid(plot_grid(a + theme(legend.position = "none") + theme(axis.title.x = element_text(color = "white")),
+                           b + theme(legend.position = "none") + ylab(NULL),
+                           c + theme(legend.position = "none") + theme(axis.title.x = element_text(color = "white")) + ylab(NULL),
+                           nrow = 1, rel_widths = c(1.05, 1, 1)),
+                 get_plot_component(a, "guide-box-bottom", return_all = TRUE), nrow = 2, rel_heights = c(1, 0.12))
 
 #create sankey plot
 sankey <- ggplot(ind_arcs_sankey, aes(x = x, next_x = next_x,
@@ -425,7 +425,7 @@ sankey <- ggplot(ind_arcs_sankey, aes(x = x, next_x = next_x,
 
 #combine and save plot
 png("plots/time_dynamics.png", width = 6.8, height = 4.2, units = "in", res = 1200)
-plot_grid(top, sankey + theme(plot.margin = margin(-0.15, -0.28, 0.05, -0.28, "in")),
+plot_grid(top, sankey + theme(plot.margin = margin(0.05, -0.28, 0.05, -0.28, "in")),
           nrow = 2, rel_heights = c(1, 0.6))
 dev.off()
 
