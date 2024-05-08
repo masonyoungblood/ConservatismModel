@@ -641,3 +641,84 @@ png("plots/example_net.png", width = 6, height = 6, units = "in", res = 1200)
 par(mar=c(0,0,0,0)+.1)
 plot(igraph::sample_pa(50, directed = FALSE, m = 5), vertex.label = "", vertex.color = "black", vertex.size = 4)
 dev.off()
+
+# ASOCIAL VS. SOCIAL DYNAMICS ---------------------------------------------
+
+#set working directory and source base code
+setwd("/Users/masonyoungblood/Documents/Work/Fall 2022/Conservatism/ConservatismModel")
+source("code/functions.R")
+
+#load libraries
+library(ggplot2)
+library(cowplot)
+
+#set parameters
+n <- 1000
+t <- 500
+cost <- 0.5
+moves <- 2
+
+#set random seed
+set.seed(123)
+
+# #run asocial and social models
+# asocial <- model(pop_size = n, t = t, neg_cost = cost, n_moves = moves)
+# social <- model(pop_size = n, t = t, neg_cost = cost, n_moves = moves, gamma = 0.25, f = 2.5)
+# basic_dynamics <- list(asocial = asocial, social = social)
+# save(basic_dynamics, file = "data/basic_dynamics.RData")
+
+#load data
+load("/Users/masonyoungblood/Documents/Work/Fall 2022/Conservatism/basic_dynamics.RData")
+
+#for the two models
+plots <- lapply(1:2, function(x){
+  #process model
+  if(x == 1){output <- asocial}
+  if(x == 2){output <- social}
+  
+  #compute frequency of each strategy and status quo move
+  strats <- do.call(rbind, parallel::mclapply(1:t, function(y){
+    c(length(which(output[[y]]$advertisement == 0 & output[[y]]$negotiation == 0)),
+      length(which(output[[y]]$advertisement == 1 & output[[y]]$negotiation == 0)),
+      length(which(output[[y]]$advertisement == 0 & output[[y]]$negotiation == 1)),
+      length(which(output[[y]]$advertisement == 1 & output[[y]]$negotiation == 1)))
+  }, mc.cores = 7))
+  quos <- do.call(rbind, parallel::mclapply(1:t, function(y){
+    as.numeric(table(factor(output[[y]]$status_quo, levels = 1:moves)))
+  }, mc.cores = 7))
+  
+  #combine into data for plotting
+  strats_data <- data.frame(f = c(strats[, 1], strats[, 2], strats[, 3], strats[, 4])/n,
+                            t = rep(1:t, 4),
+                            strat = factor(rep(c("00", "10", "01", "11"), each = t), levels = c("00", "10", "01", "11")))
+  quos_data <- data.frame(f = unlist(lapply(1:moves, function(h){quos[, h]}))/n,
+                          t = rep(1:t, moves),
+                          quo = rep(as.character(1:moves), each = t))
+  
+  #produce plot of the strategies over time
+  strats_plot <- ggplot(strats_data) + geom_line(aes(x = t, y = f, group = strat, color = strat)) +
+    xlab("Timestep") + ylab("Proportion") +
+    scale_color_manual(name = "Strategy", values = c("#CC79A7", "#D55E00", "#009E73", "#0072B2")) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0.1, 0.5)) +
+    ggtitle(" ") + 
+    theme_linedraw(base_size = 8) + theme(plot.title = element_text(face = "bold"), text = element_text(family = "Avenir Next"), legend.position = "bottom")
+  
+  #produce plot of the status quo moves over time
+  quos_plot <- ggplot(quos_data) + geom_line(aes(x = t, y = f, group = quo, color = quo)) +
+    xlab("Timestep") + ylab("Proportion") +
+    scale_color_manual(name = "Status Quo", values = c("#56B4E9", "#E69F00")) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+    ggtitle(ifelse(x == 1, "Asocial", "Social")) + 
+    theme_linedraw(base_size = 8) + theme(plot.title = element_text(face = "bold"), text = element_text(family = "Avenir Next"), legend.position = "bottom")
+  
+  #return plot objects
+  return(list(strats_plot, quos_plot))
+})
+
+#create and save plot
+png("plots/basic_dynamics.png", width = 6.8, height = 4, units = "in", res = 1200)
+plot_grid(plot_grid(plots[[1]][[2]] + theme(legend.position = "none"), plots[[1]][[1]] + theme(legend.position = "none")), 
+          plot_grid(plots[[2]][[2]] + theme(legend.position = "none"), plots[[2]][[1]] + theme(legend.position = "none")), 
+          plot_grid(get_plot_component(plots[[1]][[2]], "guide-box-bottom", return_all = TRUE), get_plot_component(plots[[1]][[1]], "guide-box-bottom", return_all = TRUE)), 
+          nrow = 3, rel_heights = c(1, 1, 0.2))
+dev.off()
